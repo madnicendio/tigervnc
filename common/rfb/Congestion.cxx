@@ -21,7 +21,7 @@
  * order to avoid excessive latency in the transport. This is needed
  * because "buffer bloat" is unfortunately still a very real problem.
  *
- * The basic principle is TCP Congestion Control (RFC 5618), with the
+ * The basic principle is TCP Congestion control (RFC 5618), with the
  * addition of using the TCP Vegas algorithm. The reason we use Vegas
  * is that we run on top of a reliable transport so we need a latency
  * based algorithm rather than a loss based one. There is also a lot of
