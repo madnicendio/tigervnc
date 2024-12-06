@@ -9,7 +9,7 @@ public:
   DummyOutStream();
   ~DummyOutStream();
 
-  virtual size_t length();
+  virtual size_t length() override;
   size_t size();
   uint8_t* dump();
   bool write(uint8_t* data, size_t length);

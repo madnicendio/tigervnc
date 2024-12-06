@@ -8,7 +8,7 @@ namespace suite {
 
   double ManagerStats::delayedFramesRatio()
   {
-    return (double)delayedFrames * 100 / writeUpdateStats.size();
+    return (double)delayedFramesCounter * 100 / writeUpdateStats.size();
   }
 
   double ManagerStats::medianWriteUpdateValue(bool comparator(
@@ -150,7 +150,7 @@ namespace suite {
   {
     writeUpdateStats.push_back(update);
     if (!update.encodedInTime())
-      delayedFrames++;
+      delayedFramesCounter++;
   }
 
   void ManagerStats::print()
