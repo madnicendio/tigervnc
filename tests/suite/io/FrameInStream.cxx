@@ -20,6 +20,15 @@ namespace suite {
   {
     assert(headerParsed);
 
+    RecorderStats s; // ignored
+    return readImage(is, s);
+  }
+
+  Image* FrameInStream::readImage(std::istream& is,
+                                  RecorderStats& recorderStats)
+  {
+    assert(headerParsed);
+
     int size, width, height, x_offset, y_offset;
     double frameTime;
     ImageUpdateStats stats;
@@ -31,6 +40,8 @@ namespace suite {
        >> stats.lostDataArea >> stats.overDimensionedArea
        >> stats.encodingTime >> stats.margin;
     is.ignore();
+
+    recorderStats.stats_.push_back(stats);
 
     uint8_t* data = new uint8_t[size];
     is.read((char*)data, size);
