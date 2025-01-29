@@ -20,6 +20,8 @@ target_sources(suite PRIVATE
   codec/JPEGDecoder.cxx
   codec/timed/TimedEncoder.cxx
   codec/timed/timedEncoderFactory.cxx
+  codec/bruteforce/BruteForce.cxx
+  codec/bruteforce/BruteForceEncoder.cxx
   stats/EncoderStats.cxx
   stats/ManagerStats.cxx
   streams/DummyInStream.cxx
