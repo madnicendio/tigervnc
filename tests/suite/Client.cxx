@@ -1,5 +1,5 @@
 #include "Client.h"
-#include "codec/PPMDecoder.h"
+#include "codec/PPMEncoder.h"
 #include <rfb/CMsgReader.h>
 #include <rfb/CMsgWriter.h>
 
@@ -76,8 +76,8 @@ void Client::framebufferUpdateEnd()
 
   const uint8_t* data = pb->getBuffer(pb->getRect(), &stride);
 
-  PPMDecoder d = PPMDecoder();
-  d.encodeImageTofile(data, pb->width(), pb->height(), DEBUG_OUTPUT);
+  PPMEncoder e = PPMEncoder();
+  e.encodeImageTofile(data, pb->width(), pb->height(), DEBUG_OUTPUT);
 #endif // _DEBUG
 
   rfb::CConnection::framebufferUpdateEnd();

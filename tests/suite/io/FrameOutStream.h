@@ -2,7 +2,7 @@
 #define __SUITE_FRAME_OUT_STREAM_H__
 
 #include "ImageUpdate.h"
-#include "../codec/ImageDecoder.h"
+#include "../codec/ImageEncoder.h"
 #include <fstream>
 #include <mutex>
 
@@ -72,7 +72,7 @@ namespace suite {
   class FrameOutStream
   {
   public:
-    FrameOutStream(std::string filename, ImageDecoder* decoder);
+    FrameOutStream(std::string filename, ImageEncoder* decoder);
     ~FrameOutStream();
 
     // Assumes ownership if ImageUpdate
@@ -85,7 +85,7 @@ namespace suite {
     std::ofstream file;
     std::mutex lock; // In case updates are encoded in parallel.
     bool headerWritten;
-    const std::string decoder_;
+    const std::string encoder_;
     std::chrono::steady_clock::time_point lastFrameTime;
   };
 }

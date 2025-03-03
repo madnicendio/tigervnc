@@ -5,11 +5,14 @@ target_sources(recorder PRIVATE
   util.cxx
   ../io/FrameOutStream.cxx
   ../io/ImageUpdate.cxx
+  ../codec/ImageEncoder.cxx
   ../codec/ImageDecoder.cxx
-  ../codec/JPEGDecoder.cxx
+  ../codec/JpegDecoder.cxx
+  ../codec/JpegEncoder.cxx
   ../codec/PPMDecoder.cxx
+  ../codec/PPMEncoder.cxx
   ../codec/Image.cxx
-  ../codec/decoderFactory.cxx
+  ../codec/codecFactory.cxx
   ../../../unix/x0vncserver/Image.cxx
   ../../../unix/x0vncserver/XPixelBuffer.cxx
   ../../../unix/x0vncserver/PollingManager.cxx

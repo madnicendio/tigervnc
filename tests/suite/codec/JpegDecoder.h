@@ -8,23 +8,16 @@
 
 namespace suite {
 
-  class JPEGDecoder : public ImageDecoder
+  class JpegDecoder : public ImageDecoder
   {
   public:
-    JPEGDecoder(int quality = 100, int subsampling = 0);
-    ~JPEGDecoder();
+    JpegDecoder(int quality = 100, int subsampling = 0);
+    ~JpegDecoder();
 
     Image *decodeImageFromFile(std::string filename) override;
     Image* decodeImageFromMemory(uint8_t* data, int width, int height,
                                  int size, int x_offest = 0,
                                  int y_offset = 0) override;
-
-    void encodeImageTofile(const uint8_t* data, int width, int height,
-                           std::string filename) override;
-
-    Image* encodeImageToMemory(const uint8_t* data, int width,
-                               int height, int x_offset = 0,
-                               int y_offset = 0) override;
   private:
     int quality_;
     int subsampling_;

@@ -3,9 +3,30 @@
 
 #include "../recorder/util.h"
 #include <stdint.h>
-#include <istream>
+#include <map>
+#include <string>
 
 namespace suite {
+
+  // FIXME: Not sure where to put these, lets leave them here for now.
+  enum EncoderEnum {
+    PPM = 0,
+    JPEG,
+  };
+
+  static std::map<std::string, EncoderEnum> encodersMap = {
+    {"PPM", PPM},
+    {"JPEG", JPEG}
+  };
+
+  inline std::string encoderTypeToString(enum EncoderEnum e)
+  {
+    static std::string strings[] = {
+      "PPM",
+      "JPEG",
+    };
+    return strings[e];
+  }
 
   struct Pixel
   {

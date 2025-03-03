@@ -1,5 +1,5 @@
 #include "FrameInStream.h"
-#include "../codec/decoderFactory.h"
+#include "../codec/codecFactory.h"
 #include <ios>
 #include <iostream>
 #include <assert.h>

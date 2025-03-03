@@ -4,8 +4,8 @@
 
 namespace suite {
 
-  FrameOutStream::FrameOutStream(std::string filename, ImageDecoder* decoder)
-    : headerWritten(false), decoder_(decoder->name)
+  FrameOutStream::FrameOutStream(std::string filename, ImageEncoder* encoder)
+    : headerWritten(false), encoder_(encoder->name)
   {
     file.open(filename.c_str());
     if (!file.is_open())
@@ -53,7 +53,7 @@ namespace suite {
   {
     assert(!headerWritten);
 
-    file << decoder_ << " " << width << " " << height << " "
+    file << encoder_ << " " << width << " " << height << " "
          << interval << "\n";
     headerWritten = true;
     lastFrameTime = std::chrono::steady_clock::now();

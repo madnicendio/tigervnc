@@ -13,11 +13,14 @@ target_sources(suite PRIVATE
   Client.cxx
   Benchmark.cxx
   io/FrameInStream.cxx
-  codec/decoderFactory.cxx
+  codec/codecFactory.cxx
   codec/Image.cxx
+  codec/ImageEncoder.cxx
   codec/ImageDecoder.cxx
+  codec/PPMEncoder.cxx
   codec/PPMDecoder.cxx
-  codec/JPEGDecoder.cxx
+  codec/JpegEncoder.cxx
+  codec/JpegDecoder.cxx
   codec/timed/TimedEncoder.cxx
   codec/timed/timedEncoderFactory.cxx
   codec/bruteforce/BruteForce.cxx

@@ -1,5 +1,5 @@
 #include "Recorder.h"
-#include "../codec/decoderFactory.h"
+#include "../codec/codecFactory.h"
 
 #include <iostream>
 #include <string>
@@ -9,7 +9,7 @@ int main(int argc, char* argv[])
 {
   if(argc < 4) {
     std::string encoders;
-    for (const std::pair<std::string, DecoderEnum> pair : decodersMap) {
+    for (const std::pair<std::string, EncoderEnum> pair : encodersMap) {
       encoders += pair.first + " ";
     }
     std::cerr << "Error, incorrect arguments\n"
@@ -25,10 +25,10 @@ int main(int argc, char* argv[])
   std::string filename = argv[2];
   int framerate = atoi(argv[3]);
 
-  ImageDecoder* decoder = argc > 4 ? constructDecoder(argv[4])
-                                   : constructDecoder(JPEG);
+  ImageEncoder* encoder = argc > 4 ? constructEncoder(argv[4])
+                                   : constructEncoder(JPEG);
 
-  Recorder recorder = Recorder(filename, decoder, display, framerate);
+  Recorder recorder = Recorder(filename, encoder, display, framerate);
 
   recorder.startRecording();
 

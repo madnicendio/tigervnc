@@ -10,9 +10,9 @@
 
 namespace suite {
 
-  Recorder::Recorder(std::string filename, ImageDecoder* decoder,
+  Recorder::Recorder(std::string filename, ImageEncoder* encoder,
                      std::string display, int framerate)
-    : factory(true), decoder_(decoder), interval(1000.0/framerate),
+    : factory(true), encoder_(encoder), interval(1000.0/framerate),
       intervalThreshold(interval/1000), lastImage(nullptr)
   {
     // XOpenDisplay takes ownership of display string,
@@ -30,7 +30,7 @@ namespace suite {
 
     geo = new Geometry(DisplayWidth(dpy, DefaultScreen(dpy)),
                        DisplayHeight(dpy, DefaultScreen(dpy)));
-    fs = new FrameOutStream(filename, decoder);
+    fs = new FrameOutStream(filename, encoder_);
 
     int xdamageErrorBase;
     if (!XDamageQueryExtension(dpy, &xdamageEventBase, &xdamageErrorBase)) {
@@ -46,7 +46,7 @@ namespace suite {
   Recorder::~Recorder()
   {
     delete fs;
-    delete decoder_;
+    delete encoder_;
   }
 
   void Recorder::startRecording()
@@ -164,7 +164,7 @@ namespace suite {
     const uint8_t* data = (uint8_t*) damagedImage->xim->data;
 
     // Save changed rectangle
-    suite::Image* image = decoder_->encodeImageToMemory(data,
+    suite::Image* image = encoder_->encodeImageToMemory(data,
                                                         width, height,
                                                         x_offset,
                                                         y_offset);

@@ -14,7 +14,7 @@ namespace suite {
   class Recorder
   {
   public:
-    Recorder(std::string filename, ImageDecoder* decoder,
+    Recorder(std::string filename, ImageEncoder* decoder,
              std::string display, int framerate);
     ~Recorder();
 
@@ -34,7 +34,7 @@ namespace suite {
     FrameOutStream* fs;
     Geometry* geo;
     ImageFactory factory;
-    ImageDecoder* decoder_;
+    ImageEncoder* encoder_;
     const double interval;
     const double intervalThreshold;
     suite::Image* lastImage;
