@@ -49,7 +49,7 @@ namespace suite {
     delete encoder_;
   }
 
-  void Recorder::startRecording()
+  void Recorder::startRecording(int duration, int delay)
   {
     std::chrono::steady_clock::time_point start;
     std::chrono::steady_clock::time_point end;
@@ -64,8 +64,24 @@ namespace suite {
     sleepDuration = std::chrono::steady_clock::duration::zero();
     fs->writeHeader(geo->width(), geo->height(), interval);
 
+    if (delay > 0) {
+        struct timespec delayTime;
+        delayTime.tv_sec = delay;
+        delayTime.tv_nsec = 0;
+        pselect(0, nullptr, nullptr, nullptr, &delayTime, nullptr);
+    }
+
+    std::chrono::steady_clock::time_point startTime = std::chrono::steady_clock::now();
+
     // FIXME: stopRecording() should stop the loop
+    int imageNr = 0;
     while (true) {
+      imageNr++;
+      auto elapsed = std::chrono::steady_clock::now() - startTime;
+      if (elapsed >= std::chrono::seconds(duration)) {
+          exit(0);
+      }
+
       std::vector<XEvent> events;
       std::chrono::duration<double, std::milli> encodeTime;
 
@@ -92,7 +108,7 @@ namespace suite {
       lastImageStats.margin = interval - encodeTime_;
 
 #ifdef _DEBUG
-        std::cout << "Encoding took: " << encodeTime.count() << std::endl;
+        std::cout << "Encoding image " << imageNr << " took: " << encodeTime.count() << std::endl;
 #endif // _DEBUG
 
       // Sleep until next update
@@ -127,6 +143,9 @@ namespace suite {
 #endif // _DEBUG
       }
     }
+    #ifdef _DEBUG
+      std::cout << "Recording stopped after " << duration << " seconds\n";
+    #endif
   }
 
   void Recorder::handleEvents(std::vector<XEvent>& events)
@@ -136,8 +155,14 @@ namespace suite {
     std::vector<rfb::Rect> rects;
     for (uint i = 0; i < events.size(); i++) {
       XEvent xevent = events[i];
-      if (xevent.type == xdamageEventBase)
-        rects.push_back(rectFromEvent(xevent));
+      rfb::Rect rect = rectFromEvent(xevent);
+      // Ensure the rect is valid (non-zero width and height)
+      if (rect.width() > 0 && rect.height() > 0) {
+          rects.push_back(rect);
+      } else {
+          std::cerr << "Warning: Skipping invalid rectangle: width="
+                    << rect.width() << ", height=" << rect.height() << std::endl;
+      }
     }
 
     if (!rects.size())
@@ -157,6 +182,11 @@ namespace suite {
     const int height = damagedRect.br.y - damagedRect.tl.y;
     const int x_offset = damagedRect.tl.x;
     const int y_offset = damagedRect.tl.y;
+
+    if (!width || !height) {
+      std::cout << "Skipping empty rectangle" << std::endl;
+      return;
+    }
 
     // Get the damaged region from the display
     ::Image* damagedImage = factory.newImage(dpy, width, height);

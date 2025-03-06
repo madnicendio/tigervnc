@@ -19,7 +19,7 @@ namespace suite {
     ~Recorder();
 
     // Starts recording to file
-    void startRecording();
+    void startRecording(int duration, int delay);
     void stopRecording();
 
     void handleEvents(std::vector<XEvent>& events);

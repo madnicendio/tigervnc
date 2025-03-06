@@ -24,6 +24,8 @@ namespace suite {
 
 #ifdef _DEBUG
     Server* debugServer_;
+#else
+  Server* debugServer_ = nullptr;
 #endif // _DEBUG
 
   protected:

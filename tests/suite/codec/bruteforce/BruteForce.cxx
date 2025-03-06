@@ -43,7 +43,7 @@ namespace suite {
 
     RecorderStats recorderStats;  // unused
     while (file.peek() != EOF) {
-      const Image* image = is.readImage(file, recorderStats);
+      const Image* image = is.readImage(file, recorderStats, -1);
       server_->loadImage(image, image->x_offset_, image->y_offset_);
       server_->out->clear();
       delete image;
