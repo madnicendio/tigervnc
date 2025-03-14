@@ -32,6 +32,7 @@ namespace rfb {
                    const Palette& palette) override;
     void writeSolidRect(int width, int height, const PixelFormat& pf,
                         const uint8_t* colour) override;
+    const char* getName() const override { return "RawEncoder"; }
   };
 }
 #endif

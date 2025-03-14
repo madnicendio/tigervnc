@@ -40,6 +40,8 @@ namespace rfb {
     void writeSolidRect(int width, int height, const PixelFormat& pf,
                         const uint8_t* colour) override;
 
+    const char* getName() const override { return "TightEncoder"; }
+
   protected:
     void writeMonoRect(const PixelBuffer* pb, const Palette& palette);
     void writeIndexedRect(const PixelBuffer* pb, const Palette& palette);

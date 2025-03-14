@@ -34,6 +34,7 @@ namespace rfb {
                    const Palette& palette) override;
     void writeSolidRect(int width, int height, const PixelFormat& pf,
                         const uint8_t* colour) override;
+    const char* getName() const override { return "RREEncoder"; }
   private:
     template<class T>
     inline void writePixel(rdr::OutStream* os, T pixel);

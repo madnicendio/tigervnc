@@ -20,6 +20,7 @@ namespace suite {
     // If this is a Manager meant for debugging, leave the
     // rfb::EncodeManager as is and keep one TimedEncoder to record
     // stats.
+    fprintf(stderr, "Manager::Manager1\n");
     if (debug) {
       stats_.encoders.push_back(constructTimedEncoder(encoderTight, conn_));
       return;
@@ -33,16 +34,19 @@ namespace suite {
     }
   }
 
-  Manager::Manager(rfb::SConnection* conn_, EncoderSettings settings)
+  Manager::Manager(rfb::SConnection* conn_, EncoderSettings& settings)
                                          : EncodeManager(conn_),
                                            SINGLE_ENCODER(true),
                                            currentWriteUpdate(0)
   {
+    fprintf(stderr, "Manager::Manager2\n");
     // Free encoders from EncodeManager and replace with TimedEncoders
     for (rfb::Encoder* e : encoders)
       delete e;
 
     EncoderClass encoderClass = settings.encoderClass;
+    fprintf(stderr, "settings.encoderClass = %d\n", settings.encoderClass);
+    // iterera här?
     TimedEncoder* timedEncoder = constructTimedEncoder(encoderClass, conn_);
     stats_.encoders.push_back(timedEncoder);
     setActiveEncoder(timedEncoder);

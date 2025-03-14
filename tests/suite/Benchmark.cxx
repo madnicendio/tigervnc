@@ -51,20 +51,29 @@ Benchmark::~Benchmark()
 
 void Benchmark::runBenchmark()
 {
-  EncoderSettings* settings;
-
-  settings = new EncoderSettings[ENCODERS_COUNT];
+  EncoderSettings settings;
+  std::vector<int32_t> encodingList;
 
   for (uint i = 0; i < ENCODERS_COUNT; i++) {
-    settings[i] = encoderSettings(static_cast<EncoderClass>(i));
+      EncoderSettings enc = encoderSettings(static_cast<EncoderClass>(i));
+      encodingList.insert(encodingList.end(), enc.rfbEncoding, enc.rfbEncoding + enc.encodingSize);
   }
 
-  runBenchmark(settings, ENCODERS_COUNT);
+  // Assign the collected encodings to `settings`
+  settings.encodingSize = encodingList.size();
+  settings.rfbEncoding = new int32_t[settings.encodingSize];
+  std::copy(encodingList.begin(), encodingList.end(), settings.rfbEncoding);
 
-  delete [] settings;
+  settings.encoderClass = enumEncoder::encoderTight;
+
+  fprintf(stderr, "settings.encoderClass = %d\n", settings.encoderClass);
+  // Run the benchmark with the single settings object
+  runBenchmark(settings);
+
+  delete [] settings.rfbEncoding;
 }
 
-void Benchmark::runBenchmark(EncoderSettings* settings, size_t len)
+void Benchmark::runBenchmark(EncoderSettings& settings)
 {
   FrameInStream is;
   std::ifstream file;
@@ -73,16 +82,12 @@ void Benchmark::runBenchmark(EncoderSettings* settings, size_t len)
   is = FrameInStream();
   file = std::ifstream(filename_);
   is.parseHeader(file); // FIXME: Don't parse header twice
+  printf("Running benchmark with settings: %d\n", settings.encoderClass);
 
-  // Use one Server instance per encoding
-  for (uint i = 0; i < len; i++) {
-    EncoderSettings setting = settings[i];
-    // All encoders in the server will be of one encoder type.
-    Server* s = new Server(width(), height(), setting);
+  Server* server = new Server(width(), height(), settings);
+  server->setEncodings(settings.encodingSize, settings.rfbEncoding);
+  servers[settings.encoderClass] = server;
 
-    s->setEncodings(setting.encodingSize, setting.rfbEncoding);
-    servers[setting.encoderClass] = s;
-  }
 
   std::cout << "Starting benchmark using \"" << filename_ << "\"\n";
   RecorderStats recorderStats;
@@ -91,15 +96,10 @@ void Benchmark::runBenchmark(EncoderSettings* settings, size_t len)
     imageNr++;
     const Image* image = is.readImage(file, recorderStats, imageNr);
 
-    // For each encoding we want to test, we load an image and loop
-    // through all servers
-    for (uint i = 0; i < len; i++) {
-      EncoderSettings setting = settings[i];
-      Server* server = servers[setting.encoderClass];
+    // Load image once (no need to loop through multiple servers)
+    server->loadImage(image, image->x_offset_, image->y_offset_);
+    server->out->clear();
 
-      server->loadImage(image, image->x_offset_, image->y_offset_);
-      server->out->clear();
-    }
 
 #ifdef _DEBUG
     debugServer_->loadImage(image, image->x_offset_, image->y_offset_);
@@ -108,19 +108,20 @@ void Benchmark::runBenchmark(EncoderSettings* settings, size_t len)
   }
   std::cout << "Benchmarking complete!\n";
 
-  // Loop through each server and print the corresponding statistics
-  for (auto &s : servers) {
-    // FIXME: Refactor this to a separate function
-    std::string encoderRequested = encoderClasstoString(s.first);
-    Server* server = s.second;
-    ManagerStats managerStats = server->stats();
+// Print statistics for the single server
 
-    if (!managerStats.encoders.size())
-      continue; // FIXME: throw/log error?
+  // FIXME: Refactor this to a separate function
+  std::string encoderRequested = encoderClasstoString(server->settings.encoderClass);
+  // Server* server = s.second;
+  ManagerStats managerStats = server->stats();
 
+  if (managerStats.encoders.empty()) {
+    // FIXME: throw/log error?
+    throw std::runtime_error("Empty encoder list");
+} else {
     managerStats.print();
-    delete server;
-  }
+}
+  delete server;
 }
 
 EncoderSettings Benchmark::encoderSettings(EncoderClass encoderClass,

@@ -14,11 +14,13 @@ namespace suite {
     manager = new Manager(this, debug);
   }
 
-  Server::Server(int width, int height, EncoderSettings settings_,
+  Server::Server(int width, int height, EncoderSettings& settings_,
                                         rfb::PixelFormat pf)
     : rfb::SConnection(rfb::AccessFull), settings(settings_)
   {
     init(width, height, pf);
+    fprintf(stderr, "Server::Server2\n");
+    fprintf(stderr, "settings.encoderClass = %d\n", settings.encoderClass);
     manager = new Manager(this, settings_);
   }
 

@@ -14,7 +14,7 @@ namespace suite {
     ~Benchmark();
 
     // Runs decoding benchmark on the server.
-    void runBenchmark(EncoderSettings* settings, size_t len);
+    void runBenchmark(EncoderSettings& settings);
     // Default benchmark runs each encoder once (ENCODERS_COUNT in
     // total)
     void runBenchmark();

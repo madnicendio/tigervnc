@@ -42,6 +42,8 @@ namespace rfb {
     void writeSolidRect(int width, int height, const PixelFormat& pf,
                         const uint8_t* colour) override;
 
+    const char* getName() const override { return "TightJPEGEncoder"; }
+
   protected:
     void writeCompact(uint32_t value, rdr::OutStream* os);
 

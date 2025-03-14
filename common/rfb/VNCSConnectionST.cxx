@@ -66,7 +66,7 @@ VNCSConnectionST::VNCSConnectionST(VNCServerST* server_, network::Socket *s,
 {
   setStreams(&sock->inStream(), &sock->outStream());
   peerEndpoint = sock->getPeerEndpoint();
-
+  fprintf(stderr, "VNCSConnectionST::VNCSConnectionST");
   // Kick off the idle timer
   if (rfb::Server::idleTimeout) {
     // minimum of 15 seconds while authenticating

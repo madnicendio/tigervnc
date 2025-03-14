@@ -15,6 +15,7 @@ namespace suite {
   TimedEncoder* constructTimedEncoder(enumEncoder::EncoderClass encoder,
                                       rfb::SConnection* sconn)
   {
+    fprintf(stderr, "encoder = %d\n", encoder);
     rfb::Encoder* e;
     switch(encoder) {
     case enumEncoder::encoderRaw:

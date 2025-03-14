@@ -86,6 +86,8 @@ namespace rfb {
                                 const PixelFormat& pf,
                                 const uint8_t* colour)=0;
 
+    virtual const char* getName() const = 0;
+
   protected:
     // Helper method for redirecting a single colour palette to the
     // short cut method.

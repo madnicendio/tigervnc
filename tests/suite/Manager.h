@@ -40,7 +40,7 @@ namespace suite {
     Manager(class rfb::SConnection *conn_, bool debug);
     // Creates an EncodingManager that only uses the specified Encoder
     // for all encodings.
-    Manager(class rfb::SConnection *conn_, EncoderSettings settings);
+    Manager(class rfb::SConnection *conn_, EncoderSettings& settings);
     ~Manager();
 
     void writeUpdate(const rfb::UpdateInfo& ui, const rfb::PixelBuffer* pb,

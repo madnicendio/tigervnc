@@ -343,6 +343,7 @@ bool SConnection::accessCheck(AccessRights ar) const
 
 void SConnection::setEncodings(int nEncodings, const int32_t* encodings)
 {
+  // encodings: an array of encoding types
   int i;
 
   preferredEncoding = encodingRaw;

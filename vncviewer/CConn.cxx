@@ -506,6 +506,8 @@ void CConn::autoSelectFormatAndEncoding()
   setPreferredEncoding(encodingTight);
 
   // Select appropriate quality level
+  // If JPEG is allowed it adjusts the quality level based on bpsEstimate
+  // (estimated network bandwidth in bits per second).
   if (!noJpeg) {
     if (bpsEstimate > 16000000)
       newQualityLevel = 8;

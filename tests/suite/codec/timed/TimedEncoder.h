@@ -123,6 +123,8 @@ namespace suite {
     void setFineQualityLevel(int quality, int subsampling) override;
     int getCompressLevel() override;
     int getQualityLevel() override;
+    const char* getName() const override { return "TimedEncoder"; }
+
 
     uint currentWriteUpdate;
   private:

@@ -362,8 +362,27 @@ void EncodeManager::doUpdate(bool allowLossy, const Region& changed_,
     conn->writer()->writeFramebufferUpdateEnd();
 }
 
+const char* encoderClassToString(EncoderClass encoder) {
+  switch (encoder) {
+    case encoderRaw: return "Raw";
+    case encoderRRE: return "RRE";
+    case encoderHextile: return "Hextile";
+    case encoderZRLE: return "ZRLE";
+    case encoderTight: return "Tight";
+    case encoderTightJPEG: return "TightJPEG";
+    default: return "Unknown";
+  }
+}
+
 void EncodeManager::prepareEncoders(bool allowLossy)
+ /*
+  * This function's goal is to decide which encoder to use for various roles,
+  * based on the client's preferences. It also configures each chosen encoder
+  * with the appropriate compression and quality settings.
+  */
 {
+  // These EncoderClass-variables will store which encoder should be used for
+  // each type of image data.
   enum EncoderClass solid, bitmap, bitmapRLE;
   enum EncoderClass indexed, indexedRLE, fullColour;
 
@@ -373,10 +392,17 @@ void EncodeManager::prepareEncoders(bool allowLossy)
 
   std::vector<int>::iterator iter;
 
+  // All six EncoderClass-variables are initially set to encoderRaw. This means
+  // that if no better options is found, the "raw" encoder till be the fallback
+  // option.
   solid = bitmap = bitmapRLE = encoderRaw;
   indexed = indexedRLE = fullColour = encoderRaw;
 
+  // Check the client's pixel format so that it is at least 16. A higher bpp
+  // generally supports more complex encodings like JPEG.
   allowJPEG = conn->client.pf().bpp >= 16;
+  // Disallow JPEG encoding if the client doesn't support lossy encoders and the
+  // JPEG encoder does not support a lossless mode.
   if (!allowLossy) {
     if (encoders[encoderTightJPEG]->losslessQuality == -1)
       allowJPEG = false;
@@ -394,6 +420,9 @@ void EncodeManager::prepareEncoders(bool allowLossy)
     bitmapRLE = indexedRLE = fullColour = encoderHextile;
     break;
   case encodingTight:
+    // If JPEG in Tight mode is supported and allowed, it uses that
+    // for full-colour encoding; otherwise, it falls back to a standard
+    // Tight encoder. Both indexed and bitmap encoders are set to Tight.
     if (encoders[encoderTightJPEG]->isSupported() && allowJPEG)
       fullColour = encoderTightJPEG;
     else
@@ -408,7 +437,9 @@ void EncodeManager::prepareEncoders(bool allowLossy)
     break;
   }
 
-  // Any encoders still unassigned?
+  // After the client preference, some roles may still be set to encoderRaw
+  // (indicating no specific encoder was chosen yet). The code then attempts
+  // to assign better defaults
 
   if (fullColour == encoderRaw) {
     if (encoders[encoderTightJPEG]->isSupported() && allowJPEG)
@@ -456,12 +487,20 @@ void EncodeManager::prepareEncoders(bool allowLossy)
     indexed = indexedRLE = fullColour = encoderTightJPEG;
   }
 
+  // The chosen encoder for each role is stored in a container
+  // (activeEncoders), which is used later to determine
+  // which encoder to use when encoding a particular type of
+  // image data.
+
   activeEncoders[encoderSolid] = solid;
   activeEncoders[encoderBitmap] = bitmap;
   activeEncoders[encoderBitmapRLE] = bitmapRLE;
   activeEncoders[encoderIndexed] = indexed;
   activeEncoders[encoderIndexedRLE] = indexedRLE;
   activeEncoders[encoderFullColour] = fullColour;
+
+  // For each encoder in the activeEncoders map, the function retrieves
+  // the corresponding Encoder object and configures it.
 
   for (iter = activeEncoders.begin(); iter != activeEncoders.end(); ++iter) {
     Encoder *encoder;
@@ -481,6 +520,14 @@ void EncodeManager::prepareEncoders(bool allowLossy)
       encoder->setFineQualityLevel(-1, subsampleUndefined);
     }
   }
+  printf("Selected encoders:\n");
+  printf("  Solid:       %s\n", encoderClassToString(solid));
+  printf("  Bitmap:      %s\n", encoderClassToString(bitmap));
+  printf("  BitmapRLE:   %s\n", encoderClassToString(bitmapRLE));
+  printf("  Indexed:     %s\n", encoderClassToString(indexed));
+  printf("  IndexedRLE:  %s\n", encoderClassToString(indexedRLE));
+  printf("  FullColour:  %s\n", encoderClassToString(fullColour));
+  exit(0);
 }
 
 Region EncodeManager::getLosslessRefresh(const Region& req,
@@ -796,6 +843,8 @@ void EncodeManager::writeRects(const Region& changed, const PixelBuffer* pb)
 
 void EncodeManager::writeSubRect(const Rect& rect, const PixelBuffer *pb)
 {
+  fprintf(stderr, "\nEncodeManager::writeSubRect\n");
+  fprintf(stderr, "Rect dimensions: width = %d, height = %d\n", rect.width(), rect.height());
   PixelBuffer *ppb;
 
   Encoder *encoder;
@@ -827,6 +876,7 @@ void EncodeManager::writeSubRect(const Rect& rect, const PixelBuffer *pb)
     else
       maxColours = 96;
   }
+  fprintf(stderr, "Max colours after Tight encoder exception: %u\n", maxColours);
 
   if (maxColours < 2)
     maxColours = 2;
@@ -838,34 +888,43 @@ void EncodeManager::writeSubRect(const Rect& rect, const PixelBuffer *pb)
   if (maxColours > encoder->maxPaletteSize)
     maxColours = encoder->maxPaletteSize;
 
+  fprintf(stderr, "Final maxColours: %u\n", maxColours);
   ppb = preparePixelBuffer(rect, pb, true);
 
-  if (!analyseRect(ppb, &info, maxColours))
+  if (!analyseRect(ppb, &info, maxColours)) {
+    fprintf(stderr, "Failed to analyze rectangle\n");
     info.palette.clear();
+  }
 
   // Different encoders might have different RLE overhead, but
   // here we do a guess at RLE being the better choice if reduces
   // the pixel count by 50%.
   useRLE = info.rleRuns <= (rect.area() * 2);
 
-  switch (info.palette.size()) {
+switch (info.palette.size()) {
   case 0:
     type = encoderFullColour;
+    fprintf(stderr, "Palette size 0, using encoderFullColour\n");
     break;
   case 1:
     type = encoderSolid;
+    fprintf(stderr, "Palette size 1, using encoderSolid\n");
     break;
   case 2:
     if (useRLE)
       type = encoderBitmapRLE;
-    else
+    else {
       type = encoderBitmap;
-    break;
+      fprintf(stderr, "Palette size 2, using %s encoder\n", useRLE ? "encoderBitmapRLE" : "encoderBitmap");
+    }
+      break;
   default:
     if (useRLE)
-      type = encoderIndexedRLE;
-    else
-      type = encoderIndexed;
+      type = encoderIndexedRLE; // kolla om detta blir tight
+    else {
+        type = encoderIndexed; // kolla om detta blir tight
+      fprintf(stderr, "Palette size > 2, using %s encoder\n", useRLE ? "encoderIndexedRLE" : "encoderIndexed");
+    }
   }
 
   encoder = startRect(rect, type);
@@ -1037,16 +1096,19 @@ bool EncodeManager::analyseRect(const PixelBuffer *pb,
 
   buffer = pb->getBuffer(pb->getRect(), &stride);
 
+// Kolla antalet bitar per pixel
   switch (pb->getPF().bpp) {
   case 32:
     return analyseRect(pb->width(), pb->height(),
                        (const uint32_t*)buffer, stride,
                        info, maxColours);
   case 16:
+  fprintf(stderr, "16 bpp\n");
     return analyseRect(pb->width(), pb->height(),
                        (const uint16_t*)buffer, stride,
                        info, maxColours);
   default:
+  fprintf(stderr, "8 bpp\n");
     return analyseRect(pb->width(), pb->height(),
                        (const uint8_t*)buffer, stride,
                        info, maxColours);
@@ -1112,11 +1174,16 @@ inline bool EncodeManager::analyseRect(int width, int height,
     int w_ = width;
     while (w_--) {
       if (*buffer != colour) {
-        if (!info->palette.insert(colour, count))
+        // fprintf(stderr, "Color change detected. Old: %d, New: %d\n", colour, *buffer);
+        if (!info->palette.insert(colour, count)) {
+          fprintf(stderr, "Failed to insert color %d with count %d into palette\n", colour, count);
           return false;
-        if (info->palette.size() > maxColours)
+        }
+        if (info->palette.size() > maxColours) {
+          fprintf(stderr, "Palette size exceeded maxColours. Palette size: %d, maxColours: %d\n",
+                  info->palette.size(), maxColours);
           return false;
-
+        }
         // FIXME: This doesn't account for switching lines
         info->rleRuns++;
 
