@@ -90,7 +90,7 @@ if (!image) {
 
     std::cerr << "Decoded image " << imgNr << ": " << "width=" << width
     << ", height=" << height
-    << ", frameTime=" << image->frameTime_
+    << ", encodingTime=" << stats.encodingTime
     << std::endl;
 
     return image;
