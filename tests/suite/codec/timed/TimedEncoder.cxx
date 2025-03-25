@@ -3,6 +3,7 @@
 #include <rdr/MemOutStream.h>
 #include <rfb/PixelBuffer.h>
 #include <rfb/SConnection.h>
+#include <rfb/EncodeManager.h>
 #include <chrono>
 
 namespace suite {
@@ -13,7 +14,7 @@ namespace suite {
    * SConnection just before writeRect() and writeSolidRect().
    */
 
-  TimedEncoder::TimedEncoder(enumEncoder::EncoderClass encoderclass,
+  TimedEncoder::TimedEncoder(rfb::EncoderClass encoderclass,
                              rfb::Encoder* encoder,
                              rfb::SConnection* sconn)
     : rfb::Encoder(sconn, encoder->encoding, encoder->flags,
@@ -23,6 +24,8 @@ namespace suite {
       encoderOutstream(new rdr::MemOutStream(10 << 20)),
       conn_(sconn), encoder_(encoder)
   {
+    fprintf(stderr, "TimedEncoder constructor: base encoder name = %s\n", encoder->getName().c_str());
+
     stats_ = new EncoderStats {
       .writeRectEncodetime = 0,
       .writeSolidRectEncodetime = 0,
@@ -32,13 +35,14 @@ namespace suite {
       .outputSizeSolidRects = 0,
       .nRects = 0,
       .nSolidRects = 0,
-      .name = encoderClassName(encoderclass),
+      .name = suite::enumEncoder::encoderClassName(encoderclass),
       .writeUpdates = std::map<int,WriteRects>{}
     };
   }
 
   TimedEncoder::~TimedEncoder()
   {
+    fprintf(stderr, "TimedEncoder::~TimedEncoder");
     delete encoderOutstream;
     delete stats_;
     delete encoder_;
@@ -72,10 +76,11 @@ void TimedEncoder::writeSolidRect(int width, int height,
 
   void TimedEncoder::stopWriteRectTimer(const rfb::PixelBuffer* pb)
   {
+    // Här kan du hålla koll på vem som gör vad
     std::chrono::time_point<std::chrono::system_clock> now =
-      std::chrono::system_clock::now();
+    std::chrono::system_clock::now();
     std::chrono::duration<double, std::milli> time =
-      std::chrono::duration<double, std::milli>(now - writeRectStart);
+    std::chrono::duration<double, std::milli>(now - writeRectStart);
 
     // Keep track of rects belonging to the same writeUpdate().
     WriteRect stats{
@@ -83,8 +88,10 @@ void TimedEncoder::writeSolidRect(int width, int height,
       .pixelCount =
         static_cast<unsigned long long>(pb->width() * pb->height()),
     };
+    // fprintf(stderr, "Debug: Adding to writeUpdates[%d]\n", currentWriteUpdate);
     stats_->writeUpdates[currentWriteUpdate].writeRects
       .push_back(stats);
+    // fprintf(stderr, "Debug: writeUpdates size after update = %zu\n", stats_->writeUpdates.size());
 
     stats_->writeRectEncodetime += time.count();
     stats_->inputSizeRects += pb->width() * pb->height() * BPP;

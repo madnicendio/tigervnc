@@ -31,6 +31,9 @@ namespace suite {
   };
 
   struct EncoderStats {
+    // EncoderStats() { fprintf(stderr, "EncoderStats created\n"); }
+    // ~EncoderStats() { fprintf(stderr, "EncoderStats destroyed\n"); }
+
     long double writeRectEncodetime;
     long double writeSolidRectEncodetime;
     unsigned long long inputSizeRects;

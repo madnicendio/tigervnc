@@ -61,15 +61,7 @@ static const int RecentChangeTimeout = 50;
 
 namespace rfb {
 
-enum EncoderClass {
-  encoderRaw,
-  encoderRRE,
-  encoderHextile,
-  encoderTight,
-  encoderTightJPEG,
-  encoderZRLE,
-  encoderClassMax,
-};
+
 
 enum EncoderType {
   encoderSolid,
@@ -136,6 +128,7 @@ EncodeManager::EncodeManager(SConnection* conn_)
   : conn(conn_), recentChangeTimer(this)
 {
   StatsVector::iterator iter;
+  fprintf(stderr, "EncodeManager::EncodeManager\n");
 
   encoders.resize(encoderClassMax, nullptr);
   activeEncoders.resize(encoderTypeMax, encoderRaw);
@@ -520,14 +513,13 @@ void EncodeManager::prepareEncoders(bool allowLossy)
       encoder->setFineQualityLevel(-1, subsampleUndefined);
     }
   }
-  printf("Selected encoders:\n");
-  printf("  Solid:       %s\n", encoderClassToString(solid));
-  printf("  Bitmap:      %s\n", encoderClassToString(bitmap));
-  printf("  BitmapRLE:   %s\n", encoderClassToString(bitmapRLE));
-  printf("  Indexed:     %s\n", encoderClassToString(indexed));
-  printf("  IndexedRLE:  %s\n", encoderClassToString(indexedRLE));
-  printf("  FullColour:  %s\n", encoderClassToString(fullColour));
-  exit(0);
+  // printf("Selected encoders:\n");
+  // printf("  Solid:       %s\n", encoderClassToString(solid));
+  // printf("  Bitmap:      %s\n", encoderClassToString(bitmap));
+  // printf("  BitmapRLE:   %s\n", encoderClassToString(bitmapRLE));
+  // printf("  Indexed:     %s\n", encoderClassToString(indexed));
+  // printf("  IndexedRLE:  %s\n", encoderClassToString(indexedRLE));
+  // printf("  FullColour:  %s\n", encoderClassToString(fullColour));
 }
 
 Region EncodeManager::getLosslessRefresh(const Region& req,
@@ -843,8 +835,8 @@ void EncodeManager::writeRects(const Region& changed, const PixelBuffer* pb)
 
 void EncodeManager::writeSubRect(const Rect& rect, const PixelBuffer *pb)
 {
-  fprintf(stderr, "\nEncodeManager::writeSubRect\n");
-  fprintf(stderr, "Rect dimensions: width = %d, height = %d\n", rect.width(), rect.height());
+  // fprintf(stderr, "\nEncodeManager::writeSubRect\n");
+  // fprintf(stderr, "Rect dimensions: width = %d, height = %d\n", rect.width(), rect.height());
   PixelBuffer *ppb;
 
   Encoder *encoder;
@@ -876,7 +868,7 @@ void EncodeManager::writeSubRect(const Rect& rect, const PixelBuffer *pb)
     else
       maxColours = 96;
   }
-  fprintf(stderr, "Max colours after Tight encoder exception: %u\n", maxColours);
+  // fprintf(stderr, "Max colours after Tight encoder exception: %u\n", maxColours);
 
   if (maxColours < 2)
     maxColours = 2;
@@ -888,11 +880,11 @@ void EncodeManager::writeSubRect(const Rect& rect, const PixelBuffer *pb)
   if (maxColours > encoder->maxPaletteSize)
     maxColours = encoder->maxPaletteSize;
 
-  fprintf(stderr, "Final maxColours: %u\n", maxColours);
+  // fprintf(stderr, "Final maxColours: %u\n", maxColours);
   ppb = preparePixelBuffer(rect, pb, true);
 
   if (!analyseRect(ppb, &info, maxColours)) {
-    fprintf(stderr, "Failed to analyze rectangle\n");
+    // fprintf(stderr, "Failed to analyze rectangle\n");
     info.palette.clear();
   }
 
@@ -904,18 +896,18 @@ void EncodeManager::writeSubRect(const Rect& rect, const PixelBuffer *pb)
 switch (info.palette.size()) {
   case 0:
     type = encoderFullColour;
-    fprintf(stderr, "Palette size 0, using encoderFullColour\n");
+    // fprintf(stderr, "Palette size 0, using encoderFullColour\n");
     break;
   case 1:
     type = encoderSolid;
-    fprintf(stderr, "Palette size 1, using encoderSolid\n");
+    // fprintf(stderr, "Palette size 1, using encoderSolid\n");
     break;
   case 2:
     if (useRLE)
       type = encoderBitmapRLE;
     else {
       type = encoderBitmap;
-      fprintf(stderr, "Palette size 2, using %s encoder\n", useRLE ? "encoderBitmapRLE" : "encoderBitmap");
+      // fprintf(stderr, "Palette size 2, using %s encoder\n", useRLE ? "encoderBitmapRLE" : "encoderBitmap");
     }
       break;
   default:
@@ -1180,8 +1172,7 @@ inline bool EncodeManager::analyseRect(int width, int height,
           return false;
         }
         if (info->palette.size() > maxColours) {
-          fprintf(stderr, "Palette size exceeded maxColours. Palette size: %d, maxColours: %d\n",
-                  info->palette.size(), maxColours);
+          // fprintf(stderr, "Palette size exceeded maxColours. Palette size: %d, maxColours: %d\n", info->palette.size(), maxColours);
           return false;
         }
         // FIXME: This doesn't account for switching lines

@@ -36,6 +36,7 @@ RawEncoder::RawEncoder(SConnection* conn_) :
 
 RawEncoder::~RawEncoder()
 {
+  fprintf(stderr, "RawEncoder::~RawEncoder()");
 }
 
 bool RawEncoder::isSupported()

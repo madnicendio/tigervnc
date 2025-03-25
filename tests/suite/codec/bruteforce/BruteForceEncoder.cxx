@@ -8,7 +8,7 @@
 namespace suite {
   BruteForceEncoder::BruteForceEncoder(rfb::SConnection* sconn,
                                        std::vector<TimedEncoder*> encoders)
-    : TimedEncoder(enumEncoder::encoderHextile,
+    : TimedEncoder(rfb::encoderHextile,
                    new rfb::RawEncoder(sconn), sconn),
       encoders_(encoders)
   {
@@ -76,7 +76,7 @@ namespace suite {
 
   void BruteForceEncoder::bestEncoder(double time,
                                            uint outputSize,
-                                           enumEncoder::EncoderClass encoder,
+                                           rfb::EncoderClass encoder,
                                            BestEncoder* best)
   {
     bool firstComparison = best->outputSize == 0;

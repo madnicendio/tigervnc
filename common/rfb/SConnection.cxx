@@ -343,14 +343,21 @@ bool SConnection::accessCheck(AccessRights ar) const
 
 void SConnection::setEncodings(int nEncodings, const int32_t* encodings)
 {
-  // encodings: an array of encoding types
   int i;
+  // Likt autoSelectFormatAndEncoding - sätt i första hand encodingTight, encodings[5] förutsatt att den är suppported
 
-  preferredEncoding = encodingRaw;
-  for (i = 0;i < nEncodings;i++) {
-    if (EncodeManager::supported(encodings[i])) {
-      preferredEncoding = encodings[i];
-      break;
+  // Try to use encodingTight first if it is supported
+  if (EncodeManager::supported(encodingTight)) {
+    preferredEncoding = encodingTight;
+    printf("Selected preferred encoding: %d\n", preferredEncoding);
+  } else {
+    preferredEncoding = encodingRaw;
+    for (i = 0;i < nEncodings;i++) {
+      if (EncodeManager::supported(encodings[i])) {
+        preferredEncoding = encodings[i];
+        // printf("Selected preferred encoding: %d\n", preferredEncoding);
+        break;
+      }
     }
   }
 

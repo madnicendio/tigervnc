@@ -80,12 +80,12 @@ namespace suite {
   void BruteForce::setDefaultBruteForceEncoder()
   {
     std::vector<TimedEncoder*> encoders = {
-      constructTimedEncoder(EncoderClass::encoderRaw, server_),
-      constructTimedEncoder(EncoderClass::encoderRRE, server_),
-      constructTimedEncoder(EncoderClass::encoderHextile, server_),
-      constructTimedEncoder(EncoderClass::encoderTight, server_),
-      constructTimedEncoder(EncoderClass::encoderTightJPEG, server_),
-      constructTimedEncoder(EncoderClass::encoderZRLE, server_),
+      constructTimedEncoder(rfb::EncoderClass::encoderRaw, server_),
+      constructTimedEncoder(rfb::EncoderClass::encoderRRE, server_),
+      constructTimedEncoder(rfb::EncoderClass::encoderHextile, server_),
+      constructTimedEncoder(rfb::EncoderClass::encoderTight, server_),
+      constructTimedEncoder(rfb::EncoderClass::encoderTightJPEG, server_),
+      constructTimedEncoder(rfb::EncoderClass::encoderZRLE, server_),
     };
 
     // FIXME: don't hardcode values

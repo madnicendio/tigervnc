@@ -14,7 +14,7 @@ namespace suite {
     ~Benchmark();
 
     // Runs decoding benchmark on the server.
-    void runBenchmark(EncoderSettings& settings);
+    void runBenchmark(EncoderSettings* settings);
     // Default benchmark runs each encoder once (ENCODERS_COUNT in
     // total)
     void runBenchmark();
@@ -35,7 +35,7 @@ namespace suite {
   private:
     const int32_t* encodings_;
     const size_t encodingsLength_;
-    static EncoderSettings encoderSettings(EncoderClass encoderClass,
+    static EncoderSettings encoderSettings(rfb::EncoderClass encoderClass,
                                            PseudoEncodingLevel quality = NONE,
                                            PseudoEncodingLevel compression = TWO);
   };

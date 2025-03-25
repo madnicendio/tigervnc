@@ -32,7 +32,7 @@ namespace suite {
     return std::to_string(encoding);
   }
 
-  static const int ENCODERS_COUNT = encoderClassMax;
+  static const int ENCODERS_COUNT = rfb::encoderClassMax;
 
   class Manager : public rfb::EncodeManager
   {
@@ -53,6 +53,7 @@ namespace suite {
     ManagerStats stats() { return stats_; };
     void updateCurrentWriteUpdate();
     void setActiveEncoder(TimedEncoder* encoder);
+    std::vector<rfb::Encoder*> getEncoders();
 
   protected:
     const bool SINGLE_ENCODER;

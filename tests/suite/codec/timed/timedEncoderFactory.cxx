@@ -12,28 +12,28 @@
 
 namespace suite {
 
-  TimedEncoder* constructTimedEncoder(enumEncoder::EncoderClass encoder,
+  TimedEncoder* constructTimedEncoder(rfb::EncoderClass encoder,
                                       rfb::SConnection* sconn)
   {
-    fprintf(stderr, "encoder = %d\n", encoder);
+    fprintf(stderr, "Construct encoder = %d\n", encoder);
     rfb::Encoder* e;
     switch(encoder) {
-    case enumEncoder::encoderRaw:
+    case rfb::encoderRaw:
       e = new rfb::RawEncoder(sconn);
       break;
-    case enumEncoder::encoderRRE:
+    case rfb::encoderRRE:
       e = new rfb::RREEncoder(sconn);
       break;
-    case enumEncoder::encoderHextile:
+    case rfb::encoderHextile:
       e = new rfb::HextileEncoder(sconn);
       break;
-    case enumEncoder::encoderTight:
+    case rfb::encoderTight:
       e = new rfb::TightEncoder(sconn);
       break;
-    case enumEncoder::encoderTightJPEG:
+    case rfb::encoderTightJPEG:
       e = new rfb::TightJPEGEncoder(sconn);
       break;
-    case enumEncoder::encoderZRLE:
+    case rfb::encoderZRLE:
       e = new rfb::ZRLEEncoder(sconn);
       break;
     default:

@@ -29,6 +29,16 @@
 #include <rfb/Timer.h>
 
 namespace rfb {
+    enum EncoderClass {
+      encoderRaw,
+      encoderRRE,
+      encoderHextile,
+      encoderTight,
+      encoderTightJPEG,
+      encoderZRLE,
+      encoderClassMax,
+    };
+
   class SConnection;
   class Encoder;
   class UpdateInfo;

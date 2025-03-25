@@ -24,6 +24,7 @@
 #include <rfb/Encoder.h>
 #include <rfb/PixelBuffer.h>
 #include <rfb/Palette.h>
+#include <cstdio>
 
 using namespace rfb;
 
@@ -38,6 +39,7 @@ Encoder::Encoder(SConnection *conn_, int encoding_,
 
 Encoder::~Encoder()
 {
+  fprintf(stderr, "Encoder::~Encoder()");
 }
 
 void Encoder::writeSolidRect(int width, int height,

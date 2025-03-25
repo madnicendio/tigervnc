@@ -9,7 +9,7 @@
 namespace suite {
 
   struct BestEncoder {
-    enumEncoder::EncoderClass encoder_;
+    rfb::EncoderClass encoder_;
     int inputSize;
     uint outputSize;
     double encodingTime;
@@ -28,15 +28,15 @@ namespace suite {
                                 const rfb::PixelFormat& pf,
                                 const uint8_t* colour) override;
     void bestEncoder(double time, uint outputSize,
-                     enumEncoder::EncoderClass encoder,
+                     rfb::EncoderClass encoder,
                      BestEncoder* best);
 
     std::vector<BestEncoder> bestEncoders() { return bestEncoders_; }
-    std::map<enumEncoder::EncoderClass, int> bestCounter() { return bestCounter_; }
+    std::map<rfb::EncoderClass, int> bestCounter() { return bestCounter_; }
   private:
     std::vector<TimedEncoder*> encoders_;
     std::vector<BestEncoder> bestEncoders_;
-    std::map<enumEncoder::EncoderClass, int> bestCounter_;
+    std::map<rfb::EncoderClass, int> bestCounter_;
   };
 }
 

@@ -158,11 +158,17 @@ namespace suite {
       int tableWidth = 40;
       int precision = 5;
       for (const auto& e : encoders) {
+        fprintf(stderr, "e->stats();\n");
+
         EncoderStats* stats = e->stats();
+        fprintf(stderr, "stats->writeUpdateStatistics();\n");
+
         WriteUpdateStatistics writeUpdates = stats->writeUpdateStatistics();
+        fprintf(stderr, "madde\n");
+        fprintf(stderr, "e->encoderClass: %d\n", e->encoderClass);
 
-        std::string encoderName = encoderClasstoString(e->encoderClass);
-
+        std::string encoderName = suite::enumEncoder::encoderClasstoString(e->encoderClass);
+        fprintf(stderr, "Trying to print a mess\n");
         // FIXME: This is one ugly mess...
         std::cout << "\n\t" << encoderName << " encoder: (seconds)\n\t\t"
                   << std::setprecision(precision) << std::fixed

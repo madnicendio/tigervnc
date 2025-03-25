@@ -8,6 +8,7 @@
 #include <rfb/Encoder.h>
 #include <rfb/PixelBuffer.h>
 #include <rfb/SConnection.h>
+#include <rfb/EncodeManager.h>
 #include <chrono>
 #include <stdexcept>
 #include <string>
@@ -15,15 +16,15 @@ namespace suite {
 
   // Copied from EncodeManager.cxx
   namespace enumEncoder {
-    enum EncoderClass {
-      encoderRaw,
-      encoderRRE,
-      encoderHextile,
-      encoderTight,
-      encoderTightJPEG,
-      encoderZRLE,
-      encoderClassMax,
-    };
+    // enum EncoderClass {
+    //   encoderRaw,
+    //   encoderRRE,
+    //   encoderHextile,
+    //   encoderTight,
+    //   encoderTightJPEG,
+    //   encoderZRLE,
+    //   encoderClassMax,
+    // };
 
     enum PseudoEncodingLevel {
       NONE = -1,
@@ -40,50 +41,53 @@ namespace suite {
     };
 
     struct EncoderSettings {
-      EncoderClass encoderClass;
+      rfb::EncoderClass encoderClass;
       int *rfbEncoding;
       size_t encodingSize;
       PseudoEncodingLevel quality;
       PseudoEncodingLevel compression;
       std::string name;
+
+
     };
 
-    inline std::string encoderClasstoString(EncoderClass encoderClass)
+    inline std::string encoderClasstoString(rfb::EncoderClass encoderClass)
     {
+      fprintf(stderr, "EncoderClass: %d\n", (int)encoderClass);
       switch (encoderClass) {
-        case encoderRaw:
+        case rfb::encoderRaw:
           return "Raw";
-        case encoderRRE:
+        case rfb::encoderRRE:
           return "RRE";
-        case encoderHextile:
+        case rfb::encoderHextile:
           return "Hextile";
-        case encoderTight:
+        case rfb::encoderTight:
           return "Tight";
-        case encoderTightJPEG:
+        case rfb::encoderTightJPEG:
           return "TightJPEG";
-        case encoderZRLE:
+        case rfb::encoderZRLE:
           return "ZRLE";
         default:
           throw std::logic_error("EncoderClass not implemented");
       }
     }
   // Copied from EncodeManager.cxx
-  inline const char *encoderClassName(EncoderClass klass)
+  inline const char *encoderClassName(rfb::EncoderClass klass)
   {
     switch (klass) {
-    case encoderRaw:
+    case rfb::encoderRaw:
       return "Raw";
-    case encoderRRE:
+    case rfb::encoderRRE:
       return "RRE";
-    case encoderHextile:
+    case rfb::encoderHextile:
       return "Hextile";
-    case encoderTight:
+    case rfb::encoderTight:
       return "Tight";
-    case encoderTightJPEG:
+    case rfb::encoderTightJPEG:
       return "Tight (JPEG)";
-    case encoderZRLE:
+    case rfb::encoderZRLE:
       return "ZRLE";
-    case encoderClassMax:
+    case rfb::encoderClassMax:
       break;
     }
 
@@ -99,15 +103,15 @@ namespace suite {
   class TimedEncoder : public rfb::Encoder
   {
   public:
-    TimedEncoder(enumEncoder::EncoderClass encoderclass,
+    TimedEncoder(rfb::EncoderClass encoderclass,
                  rfb::Encoder* encoder, rfb::SConnection* sconn);
-    ~TimedEncoder();
+    virtual ~TimedEncoder();
 
     void startWriteRectTimer();
     void stopWriteRectTimer(const rfb::PixelBuffer* pb);
     void startWriteSolidRectTimer();
     void stopWriteSolidRectTimer(int width, int height);
-    const enumEncoder::EncoderClass encoderClass;
+    const rfb::EncoderClass encoderClass;
     EncoderStats* stats() { return stats_; };
 
     bool isSupported() override { return true; };
@@ -123,7 +127,10 @@ namespace suite {
     void setFineQualityLevel(int quality, int subsampling) override;
     int getCompressLevel() override;
     int getQualityLevel() override;
-    const char* getName() const override { return "TimedEncoder"; }
+    std::string getName() const override {
+      std::string name = "TimedEncoder::" + std::string(encoder_->getName());
+      return name;
+ }
 
 
     uint currentWriteUpdate;

@@ -10,17 +10,18 @@ namespace suite {
     : rfb::SConnection(rfb::AccessFull),
       settings(defaultEncoderSettings)
   {
+    fprintf(stderr, "Server::Server (debug)\n");
     init(width, height, pf);
     manager = new Manager(this, debug);
   }
 
-  Server::Server(int width, int height, EncoderSettings& settings_,
+  Server::Server(int width, int height, EncoderSettings settings_,
                                         rfb::PixelFormat pf)
     : rfb::SConnection(rfb::AccessFull), settings(settings_)
   {
     init(width, height, pf);
-    fprintf(stderr, "Server::Server2\n");
-    fprintf(stderr, "settings.encoderClass = %d\n", settings.encoderClass);
+    fprintf(stderr, "Server::Server\n");
+    // fprintf(stderr, "settings.encoderClass = %d\n", settings.encoderClass);
     manager = new Manager(this, settings_);
   }
 
@@ -50,12 +51,20 @@ namespace suite {
 
   void Server::loadImage(const Image *image, int x, int y)
   {
+    // Define the rectangular region where the image will be loaded?
     rfb::Rect rect(x,y, x + image->width_, y + image->height_);
+
+    // Get a pointer to the pixel buffer
     int stride;
     pb_->getBuffer(rect, &stride);
+
+    // Copy the image's pixel data into the pixel buffer at the defined rectangle
     pb_->imageRect(rect, image->getBuffer());
 
+    // Create an UpdateInfo object that will hold details about the update
     rfb::UpdateInfo ui;
+
+    // Define
     const rfb::Region changed(rect);
 
     updates.add_changed(rect);

@@ -50,7 +50,6 @@ SMsgWriter::SMsgWriter(ClientParams* client_, rdr::OutStream* os_)
     needCursorPos(false), needLEDState(false),
     needQEMUKeyEvent(false), needExtMouseButtonsEvent(false)
 {
-  fprintf(stderr, "SMsgWriter::SMsgWriter");
 }
 
 SMsgWriter::~SMsgWriter()

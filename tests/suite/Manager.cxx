@@ -7,6 +7,8 @@
 
 #include <rfb/EncodeManager.h>
 #include <rfb/Encoder.h>
+#include <rfb/RawEncoder.h>
+#include <rfb/TightJPEGEncoder.h>
 #include <rfb/SConnection.h>
 #include <rfb/encodings.h>
 #include <rfb/UpdateTracker.h>
@@ -20,14 +22,16 @@ namespace suite {
     // If this is a Manager meant for debugging, leave the
     // rfb::EncodeManager as is and keep one TimedEncoder to record
     // stats.
-    fprintf(stderr, "Manager::Manager1\n");
-    if (debug) {
-      stats_.encoders.push_back(constructTimedEncoder(encoderTight, conn_));
-      return;
-    }
+    fprintf(stderr, "Manager::Manager (debug): %d\n", debug);
+    // if (debug) {
+    //   stats_.encoders.push_back(constructTimedEncoder(encoderTight, conn_));
+    //   return;
+    // }
 
-    for (int i = 0; i < encoderClassMax; i++) {
-      EncoderClass klass = static_cast<EncoderClass>(i);
+
+    for (int i = 0; i < rfb::encoderClassMax; i++) {
+      rfb::EncoderClass klass = static_cast<rfb::EncoderClass>(i);
+      fprintf(stderr, "Creating TimedEncoder for encoderClass = %d\n", klass);
       TimedEncoder *e = new TimedEncoder(klass, encoders[klass], conn_);
       encoders[i] = e;
       stats_.encoders.push_back(e);
@@ -36,20 +40,28 @@ namespace suite {
 
   Manager::Manager(rfb::SConnection* conn_, EncoderSettings& settings)
                                          : EncodeManager(conn_),
-                                           SINGLE_ENCODER(true),
+                                           SINGLE_ENCODER(false),
                                            currentWriteUpdate(0)
   {
     fprintf(stderr, "Manager::Manager2\n");
-    // Free encoders from EncodeManager and replace with TimedEncoders
-    for (rfb::Encoder* e : encoders)
-      delete e;
 
-    EncoderClass encoderClass = settings.encoderClass;
-    fprintf(stderr, "settings.encoderClass = %d\n", settings.encoderClass);
-    // iterera här?
-    TimedEncoder* timedEncoder = constructTimedEncoder(encoderClass, conn_);
-    stats_.encoders.push_back(timedEncoder);
-    setActiveEncoder(timedEncoder);
+    for (int i = 0; i < rfb::encoderClassMax; i++) {
+      // Note that we only want to create six encoders. CopyRect is merged with Tight or Raw
+      rfb::EncoderClass klass = static_cast<rfb::EncoderClass>(i);
+      if (!encoders[klass]) {
+        fprintf(stderr, "Skipping encoderClass %d because it's nullptr\n", klass);
+        continue;
+      }
+      fprintf(stderr, "\nEncoderClass: %d\n", klass);
+      fprintf(stderr, "Actual encoding class: %s\n", encoders[klass]->getName().c_str());
+      TimedEncoder* e = new TimedEncoder(klass, encoders[klass], conn_);
+      fprintf(stderr, "Created TimedEncoder with %s \n", e->getName().c_str());
+      if (!e) {
+        fprintf(stderr, "nullptr\n");
+      }
+      encoders[klass] = e;
+      stats_.encoders.push_back(e);
+    }
   }
 
   Manager::~Manager()
@@ -117,12 +129,19 @@ namespace suite {
   }
 
   void Manager::setActiveEncoder(TimedEncoder* encoder)
+  // Används bara i Bruteforce
   {
-    encoders[encoderRaw] = encoder;
-    encoders[encoderRRE] = encoder;
-    encoders[encoderHextile] = encoder;
-    encoders[encoderTight] = encoder;
-    encoders[encoderTightJPEG] = encoder;
-    encoders[encoderZRLE] = encoder;
+    encoders[rfb::encoderRaw] = encoder;
+    encoders[rfb::encoderRRE] = encoder;
+    encoders[rfb::encoderHextile] = encoder;
+    encoders[rfb::encoderTight] = encoder;
+    encoders[rfb::encoderTightJPEG] = encoder;
+    encoders[rfb::encoderZRLE] = encoder;
+  }
+
+  std::vector<rfb::Encoder*> Manager::getEncoders()
+  {
+    return encoders;
   }
 }
+

@@ -23,6 +23,7 @@
 #include <rdr/MemOutStream.h>
 #include <rdr/ZlibOutStream.h>
 #include <rfb/Encoder.h>
+#include <string>
 
 namespace rfb {
 
@@ -40,7 +41,7 @@ namespace rfb {
     void writeSolidRect(int width, int height, const PixelFormat& pf,
                         const uint8_t* colour) override;
 
-    const char* getName() const override { return "TightEncoder"; }
+    std::string getName() const override { return "TightEncoder"; }
 
   protected:
     void writeMonoRect(const PixelBuffer* pb, const Palette& palette);

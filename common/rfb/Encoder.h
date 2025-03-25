@@ -23,6 +23,7 @@
 #include <stdint.h>
 
 #include <rfb/Rect.h>
+#include <string>
 
 namespace rfb {
   class SConnection;
@@ -86,7 +87,7 @@ namespace rfb {
                                 const PixelFormat& pf,
                                 const uint8_t* colour)=0;
 
-    virtual const char* getName() const = 0;
+    virtual std::string getName() const = 0;
 
   protected:
     // Helper method for redirecting a single colour palette to the

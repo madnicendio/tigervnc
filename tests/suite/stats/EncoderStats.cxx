@@ -45,11 +45,20 @@ namespace suite {
 
   struct WriteUpdateStatistics EncoderStats::writeUpdateStatistics()
   {
+    fprintf(stderr, "EncoderStats::writeUpdateStatistics()\n");
     std::vector<double> mPxPerSecond;
     double sumMPxPerSecond = 0;
+    fprintf(stderr, "Debug: writeUpdates size = %zu\n", writeUpdates.size());
+
     for (const auto& update : writeUpdates) {
       double timeSum = 0;
       double pixels = 0;
+
+      fprintf(stderr, "Debug: update.first address = %p\n", (void*)&update.first);
+      size_t rectCount = update.second.writeRects.size();
+      size_t solidRectCount = update.second.writeSolidRects.size();
+      fprintf(stderr, "Debug: writeRects size = %zu, writeSolidRects size = %zu\n", rectCount, solidRectCount);
+
 
       // Sum all updates belonging to the same writeUpdate
       for (const auto& rects : update.second.writeRects) {

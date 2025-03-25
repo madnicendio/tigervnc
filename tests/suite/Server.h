@@ -23,7 +23,7 @@ namespace suite {
     rfb::pseudoEncodingCompressLevel0 + 2};
 
   static const EncoderSettings defaultEncoderSettings = {
-    .encoderClass = enumEncoder::encoderTight,
+    .encoderClass = rfb::encoderTight,
     .rfbEncoding = (int*) encodings,
     .encodingSize = sizeof(encodings) / sizeof(*encodings),
     .quality = enumEncoder::EIGHT,
@@ -36,7 +36,7 @@ namespace suite {
   public:
     Server(int width, int height, rfb::PixelFormat pf = fbPF,
             bool debug = false);
-    Server(int width, int height, EncoderSettings& settings_,
+    Server(int width, int height, EncoderSettings settings_,
                                   rfb::PixelFormat pf = fbPF);
     ~Server();
 

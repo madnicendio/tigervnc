@@ -51,53 +51,54 @@ Benchmark::~Benchmark()
 
 void Benchmark::runBenchmark()
 {
-  EncoderSettings settings;
-  std::vector<int32_t> encodingList;
+  EncoderSettings* settings = new EncoderSettings;
 
-  for (uint i = 0; i < ENCODERS_COUNT; i++) {
-      EncoderSettings enc = encoderSettings(static_cast<EncoderClass>(i));
-      encodingList.insert(encodingList.end(), enc.rfbEncoding, enc.rfbEncoding + enc.encodingSize);
-  }
+  int allEncodings[] = {
+    0,  // rfb::encodingRaw
+    1,  // rfb::encodingCopyRect
+    2,  // rfb::encodingRRE
+    4,  // rfb::encodingCoRRE
+    5,  // rfb::encodingHextile
+    7,  // rfb::encodingTight
+    16  // rfb::encodingZRLE
+  };
+  settings->rfbEncoding = allEncodings;
+  settings->encodingSize = sizeof(allEncodings) / sizeof(allEncodings[0]);
+  // (start, stop, destination)
 
-  // Assign the collected encodings to `settings`
-  settings.encodingSize = encodingList.size();
-  settings.rfbEncoding = new int32_t[settings.encodingSize];
-  std::copy(encodingList.begin(), encodingList.end(), settings.rfbEncoding);
-
-  settings.encoderClass = enumEncoder::encoderTight;
-
-  fprintf(stderr, "settings.encoderClass = %d\n", settings.encoderClass);
-  // Run the benchmark with the single settings object
   runBenchmark(settings);
 
-  delete [] settings.rfbEncoding;
+  delete settings;
 }
 
-void Benchmark::runBenchmark(EncoderSettings& settings)
+void Benchmark::runBenchmark(EncoderSettings* settings)
 {
   FrameInStream is;
   std::ifstream file;
-  std::map<EncoderClass, Server*> servers;
+  // std::map<EncoderClass, Server*> servers;
 
   is = FrameInStream();
   file = std::ifstream(filename_);
   is.parseHeader(file); // FIXME: Don't parse header twice
-  printf("Running benchmark with settings: %d\n", settings.encoderClass);
 
-  Server* server = new Server(width(), height(), settings);
-  server->setEncodings(settings.encodingSize, settings.rfbEncoding);
-  servers[settings.encoderClass] = server;
+  Server* server = new Server(width(), height(), *settings);
 
+  // Set Tight as preferred encoding (just as with Auto mode)
+  server->setEncodings(settings->encodingSize, settings->rfbEncoding);
 
   std::cout << "Starting benchmark using \"" << filename_ << "\"\n";
   RecorderStats recorderStats;
   int imageNr = 0;
   while (file.peek() != EOF) {
     imageNr++;
+    // Extract the next image from the file
+    // This function uses recorderStats to record information
     const Image* image = is.readImage(file, recorderStats, imageNr);
 
     // Load image once (no need to loop through multiple servers)
     server->loadImage(image, image->x_offset_, image->y_offset_);
+    // Immediately after loading, the server's output buffer is cleared
+    // to be ready for the next image
     server->out->clear();
 
 
@@ -108,23 +109,41 @@ void Benchmark::runBenchmark(EncoderSettings& settings)
   }
   std::cout << "Benchmarking complete!\n";
 
-// Print statistics for the single server
+  // Print statistics for the single server
 
-  // FIXME: Refactor this to a separate function
-  std::string encoderRequested = encoderClasstoString(server->settings.encoderClass);
-  // Server* server = s.second;
+  // Output encoderstats:
+  std::vector<rfb::Encoder*> encoders_ = server->manager->getEncoders();
+
+  for (rfb::Encoder* e : encoders_) {
+    suite::TimedEncoder* te = dynamic_cast<suite::TimedEncoder*>(e);
+    if (te) {
+      EncoderStats* es = te->stats();
+      fprintf(stderr, "Encoder: %s, with encoding %d", te->getName().c_str(), te->encoding);
+
+      // Compression ratios
+      std::cout << "  Compression Ratio (Rectangles): " << es->compressionRatioRects() << "\n";
+      std::cout << "  Compression Ratio (Solid Rectangles): " << es->compressionRatioSolidRects() << "\n";
+      std::cout << "  Combined Compression Ratio: " << es->compressionRatioCombined() << "\n";
+    } else {
+      fprintf(stderr, "Dynamic cast failed\n");
+      continue;
+    }
+  }
+  exit(0);
+
   ManagerStats managerStats = server->stats();
 
   if (managerStats.encoders.empty()) {
     // FIXME: throw/log error?
     throw std::runtime_error("Empty encoder list");
 } else {
+  fprintf(stderr, "Print managerStats:\n");
     managerStats.print();
 }
   delete server;
 }
 
-EncoderSettings Benchmark::encoderSettings(EncoderClass encoderClass,
+EncoderSettings Benchmark::encoderSettings(rfb::EncoderClass encoderClass,
                                            PseudoEncodingLevel quality,
                                            PseudoEncodingLevel compression)
 {
@@ -149,19 +168,19 @@ EncoderSettings Benchmark::encoderSettings(EncoderClass encoderClass,
   };
 
   switch (encoderClass) {
-  case encoderRaw:
+  case rfb::encoderRaw:
     encodings[0] = rfb::encodingRaw;
     break;
-  case encoderRRE:
+  case rfb::encoderRRE:
     encodings[0] = rfb::encodingRRE;
     break;
-  case encoderHextile:
+  case rfb::encoderHextile:
     encodings[0] = rfb::encodingHextile;
     break;
-  case encoderTight:
+  case rfb::encoderTight:
     encodings[0] = rfb::encodingTight;
     break;
-  case encoderTightJPEG:
+  case rfb::encoderTightJPEG:
     if (quality == NONE)
       settings.quality = TWO;
     delete [] encodings;
@@ -170,11 +189,11 @@ EncoderSettings Benchmark::encoderSettings(EncoderClass encoderClass,
     encodings[1] = rfb::pseudoEncodingQualityLevel0 + quality;
     encodings[2] = rfb::pseudoEncodingCompressLevel0 + compression;
     encodings[3] = rfb::encodingCopyRect;
-    encodings[4] = rfb::pseudoEncodingLastRect;
+    encodings[4] = rfb::pseudoEncodingLastRect;   // denn är out of bounds men det är nog inte så noga
     settings.rfbEncoding = encodings;
     settings.encodingSize = 5;
     break;
-  case encoderZRLE:
+  case rfb::encoderZRLE:
     encodings[0] = rfb::encodingZRLE;
     break;
   default:
