@@ -61,6 +61,8 @@ void Encoder::writeSolidRect(int width, int height,
 
 void Encoder::writeSolidRect(const PixelBuffer* pb, const Palette& palette)
 {
+  // fprintf(stderr, "Encoder::writeSolidRect\n");
+
   uint32_t col32;
   uint16_t col16;
   uint8_t col8;

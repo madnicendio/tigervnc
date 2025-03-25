@@ -61,6 +61,7 @@ void TimedEncoder::writeSolidRect(int width, int height,
                                   const uint8_t* colour)
 {
   startWriteSolidRectTimer();
+  // fprintf(stderr, "TimedEncoder::writeSolidRect\n");
   encoder_->writeSolidRect(width, height, pf, colour);
   stopWriteSolidRectTimer(width, height);
 }

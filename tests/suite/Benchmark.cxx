@@ -60,7 +60,8 @@ void Benchmark::runBenchmark()
     4,  // rfb::encodingCoRRE
     5,  // rfb::encodingHextile
     7,  // rfb::encodingTight
-    16  // rfb::encodingZRLE
+    16, // rfb::encodingZRLE
+    -224 // rfb::pseudoEncodingLastRect
   };
   settings->rfbEncoding = allEncodings;
   settings->encodingSize = sizeof(allEncodings) / sizeof(allEncodings[0]);
@@ -107,28 +108,40 @@ void Benchmark::runBenchmark(EncoderSettings* settings)
 #endif // _DEBUG
     delete image;
   }
-  std::cout << "Benchmarking complete!\n";
+  std::cout << "Benchmarking complete!\n\n\n";
 
   // Print statistics for the single server
 
   // Output encoderstats:
-  std::vector<rfb::Encoder*> encoders_ = server->manager->getEncoders();
+  std::vector<rfb::Encoder*> allEncoders = server->manager->getEncoders();
 
-  for (rfb::Encoder* e : encoders_) {
-    suite::TimedEncoder* te = dynamic_cast<suite::TimedEncoder*>(e);
-    if (te) {
-      EncoderStats* es = te->stats();
-      fprintf(stderr, "Encoder: %s, with encoding %d", te->getName().c_str(), te->encoding);
+  suite::TimedEncoder* TightEncoder = dynamic_cast<suite::TimedEncoder*>(allEncoders[rfb::encoderTight]);
+  EncoderStats* TightEncoderStats =  TightEncoder->stats();
 
-      // Compression ratios
-      std::cout << "  Compression Ratio (Rectangles): " << es->compressionRatioRects() << "\n";
-      std::cout << "  Compression Ratio (Solid Rectangles): " << es->compressionRatioSolidRects() << "\n";
-      std::cout << "  Combined Compression Ratio: " << es->compressionRatioCombined() << "\n";
-    } else {
-      fprintf(stderr, "Dynamic cast failed\n");
-      continue;
-    }
-  }
+  suite::TimedEncoder* TightJPEGEncoder = dynamic_cast<suite::TimedEncoder*>(allEncoders[rfb::encoderTightJPEG]);
+  EncoderStats* TightJPEGEncoderStats =  TightJPEGEncoder->stats();
+
+  // Beräkna total tid
+  long double totalWriteRectTime = TightEncoderStats->writeRectEncodetime + TightJPEGEncoderStats->writeRectEncodetime;
+  long double totalWriteSolidRectTime = TightEncoderStats->writeSolidRectEncodetime; // TightJPEGEncoder har inte denna
+
+  // Skriv ut som en tabell
+  fprintf(stderr, "+------------------+----------------------+---------------------------+\n");
+  fprintf(stderr, "| %-16s | %-20s | %-25s |\n", "Encoder", "Rect encodetime (ms)", "SolidRect encodetime (ms)");
+  fprintf(stderr, "+------------------+----------------------+---------------------------+\n");
+
+  fprintf(stderr, "| TightEncoder     | %-20.2Lf | %-25.2Lf |\n",
+          TightEncoderStats->writeRectEncodetime,
+          TightEncoderStats->writeSolidRectEncodetime);
+
+  fprintf(stderr, "| TightJPEGEncoder | %-20.2Lf | %-25s |\n",
+          TightJPEGEncoderStats->writeRectEncodetime,
+          "N/A");
+
+  fprintf(stderr, "+------------------+----------------------+---------------------------+\n");
+  fprintf(stderr, "| %-16s | %-20.2Lf | %-25.2Lf |\n", "Total Time", totalWriteRectTime, totalWriteSolidRectTime);
+  fprintf(stderr, "+------------------+----------------------+---------------------------+\n\n\n");
+
   exit(0);
 
   ManagerStats managerStats = server->stats();
