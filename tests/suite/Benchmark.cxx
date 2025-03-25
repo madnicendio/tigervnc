@@ -123,26 +123,39 @@ void Benchmark::runBenchmark(EncoderSettings* settings)
 
   // Beräkna total tid
   long double totalWriteRectTime = TightEncoderStats->writeRectEncodetime + TightJPEGEncoderStats->writeRectEncodetime;
-  long double totalWriteSolidRectTime = TightEncoderStats->writeSolidRectEncodetime; // TightJPEGEncoder har inte denna
+  long double totalNumberOfRects = TightEncoderStats->nRects + TightJPEGEncoderStats->nRects;
+
+  // Megapixels per sekund
+  double tightMPixelsPerSecond = TightEncoderStats->megaPixelsPerSecondRects();
+  double jpegMPixelsPerSecond = TightJPEGEncoderStats->megaPixelsPerSecondRects();
+  double totalMPixelsPerSecond = (tightMPixelsPerSecond + jpegMPixelsPerSecond) / 2.0; // Medelvärde
+
+
 
   // Skriv ut som en tabell
-  fprintf(stderr, "+------------------+----------------------+---------------------------+\n");
-  fprintf(stderr, "| %-16s | %-20s | %-25s |\n", "Encoder", "Rect encodetime (ms)", "SolidRect encodetime (ms)");
-  fprintf(stderr, "+------------------+----------------------+---------------------------+\n");
+fprintf(stderr, "+------------------+----------------------+------------------+----------------------+\n");
+fprintf(stderr, "| %-16s | %-20s | %-16s | %-20s |\n",
+        "Encoder", "Rect encodetime (ms)", "Number of rects", "MPixels per second");
+fprintf(stderr, "+------------------+----------------------+------------------+----------------------+\n");
 
-  fprintf(stderr, "| TightEncoder     | %-20.2Lf | %-25.2Lf |\n",
-          TightEncoderStats->writeRectEncodetime,
-          TightEncoderStats->writeSolidRectEncodetime);
+fprintf(stderr, "| %-16s | %-20.2Lf | %-16d | %-20.2f |\n",
+        "TightEncoder",
+        TightEncoderStats->writeRectEncodetime,
+        TightEncoderStats->nRects,
+        tightMPixelsPerSecond);
 
-  fprintf(stderr, "| TightJPEGEncoder | %-20.2Lf | %-25s |\n",
-          TightJPEGEncoderStats->writeRectEncodetime,
-          "N/A");
+fprintf(stderr, "| %-16s | %-20.2Lf | %-16d | %-20.2f |\n",
+        "TightJPEGEncoder",
+        TightJPEGEncoderStats->writeRectEncodetime,
+        TightJPEGEncoderStats->nRects,
+        jpegMPixelsPerSecond);
 
-  fprintf(stderr, "+------------------+----------------------+---------------------------+\n");
-  fprintf(stderr, "| %-16s | %-20.2Lf | %-25.2Lf |\n", "Total Time", totalWriteRectTime, totalWriteSolidRectTime);
-  fprintf(stderr, "+------------------+----------------------+---------------------------+\n\n\n");
+fprintf(stderr, "+------------------+----------------------+------------------+----------------------+\n");
+fprintf(stderr, "| %-16s | %-20.2Lf | %-16Lf | %-20.2f |\n",
+        "Total", totalWriteRectTime, totalNumberOfRects, totalMPixelsPerSecond);
+fprintf(stderr, "+------------------+----------------------+------------------+----------------------+\n\n");
 
-  exit(0);
+exit(0);
 
   ManagerStats managerStats = server->stats();
 
