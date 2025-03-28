@@ -87,6 +87,10 @@ void TightEncoder::setCompressLevel(int level)
 
 void TightEncoder::writeRect(const PixelBuffer* pb, const Palette& palette)
 {
+  // FILE_DEBUG
+  // fprintf(outputFile, "%s", "Tight\n");
+  // fflush(outputFile);
+
   switch (palette.size()) {
   case 0:
     writeFullColourRect(pb);

@@ -47,6 +47,8 @@ bool RREEncoder::isSupported()
 
 void RREEncoder::writeRect(const PixelBuffer* pb, const Palette& palette)
 {
+  // FILE_DEBUG
+  fprintf(outputFile, "%s", "RRE\n");
   uint8_t* imageBuf;
   int stride;
   uint32_t bg;

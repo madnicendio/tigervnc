@@ -115,6 +115,10 @@ int TightJPEGEncoder::getQualityLevel()
 void TightJPEGEncoder::writeRect(const PixelBuffer* pb,
                                  const Palette& /*palette*/)
 {
+  // FILE_DEBUG
+  // fprintf(outputFile, "%s", "TightJPEG\n");
+  // fflush(outputFile);
+
   const uint8_t* buffer;
   int stride;
 

@@ -48,6 +48,8 @@ bool RawEncoder::isSupported()
 void RawEncoder::writeRect(const PixelBuffer* pb,
                            const Palette& /*palette*/)
 {
+  // FILE_DEBUG
+  fprintf(outputFile, "%s", "Raw\n");
   const uint8_t* buffer;
   int stride;
 

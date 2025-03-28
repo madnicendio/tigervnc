@@ -89,6 +89,8 @@ namespace rfb {
 
     virtual std::string getName() const = 0;
 
+    FILE* outputFile;
+
   protected:
     // Helper method for redirecting a single colour palette to the
     // short cut method.

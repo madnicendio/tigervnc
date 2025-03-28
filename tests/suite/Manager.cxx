@@ -44,6 +44,7 @@ namespace suite {
                                            currentWriteUpdate(0)
   {
     fprintf(stderr, "Manager::Manager2\n");
+    // For debugging
 
     for (int i = 0; i < rfb::encoderClassMax; i++) {
       // Note that we only want to create six encoders. CopyRect is merged with Tight or Raw
@@ -80,6 +81,7 @@ namespace suite {
                             const rfb::PixelBuffer* pb,
                             const rfb::RenderedCursor* renderedCursor)
   {
+    // Här ska vi kopiera in EncodeManagern
     EncodeManager::writeUpdate(ui, pb, renderedCursor);
   }
 

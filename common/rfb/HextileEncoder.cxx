@@ -55,6 +55,9 @@ bool HextileEncoder::isSupported()
 void HextileEncoder::writeRect(const PixelBuffer* pb,
                                const Palette& /*palette*/)
 {
+  // FILE_DEBUG
+  // fprintf(outputFile, "%s", "Hextile\n");
+  // fflush(outputFile);
   rdr::OutStream* os = conn->getOutStream();
   switch (pb->getPF().bpp) {
   case 8:

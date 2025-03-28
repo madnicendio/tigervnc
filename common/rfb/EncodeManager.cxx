@@ -793,11 +793,24 @@ void EncodeManager::findSolidRect(const Rect& rect, Region *changed,
 
 void EncodeManager::writeRects(const Region& changed, const PixelBuffer* pb)
 {
+  // Skapa en vektor som kommer lagra alla rektanglar + en iterator för
+  // att loopa genom rects
   std::vector<Rect> rects;
   std::vector<Rect>::const_iterator rect;
 
-  changed.get_rects(&rects);
-  for (rect = rects.begin(); rect != rects.end(); ++rect) {
+  // Vi hämtar rektanglar från changed?
+  changed.get_rects(&rects);  // kolla vidare här
+  fprintf(stderr, "Number of rectangles from get_rect: %ld\n", rects.size());
+  int totalRects = 0;
+  bool record = false;
+  FILE* file = nullptr;
+
+  if (rects.size() == 7) {
+    //record = true;
+    file = fopen("rects_initial_update.txt", "w"); // Spara rektanglar till en fil
+  }
+
+  for (rect = rects.begin(); rect != rects.end(); ++rect) { // iterera över alla rects
     int w, h, sw, sh;
     Rect sr;
 
@@ -806,34 +819,42 @@ void EncodeManager::writeRects(const Region& changed, const PixelBuffer* pb)
 
     // No split necessary?
     if (((w*h) < SubRectMaxArea) && (w < SubRectMaxWidth)) {
-      writeSubRect(*rect, pb);
+      writeSubRect(*rect, pb, record, file); // Vi behandlar rektangeln direkt
+      totalRects++;
       continue;
     }
 
+    // Är bredden ok?
     if (w <= SubRectMaxWidth)
       sw = w;
     else
       sw = SubRectMaxWidth;
 
+    // Sätter maximala höjden baserat på maxArea
     sh = SubRectMaxArea / sw;
 
     for (sr.tl.y = rect->tl.y; sr.tl.y < rect->br.y; sr.tl.y += sh) {
+      // dela upp rektangeln vertikalt (ökar med sh varje gång)
       sr.br.y = sr.tl.y + sh;
       if (sr.br.y > rect->br.y)
         sr.br.y = rect->br.y;
 
       for (sr.tl.x = rect->tl.x; sr.tl.x < rect->br.x; sr.tl.x += sw) {
+      // dela upp rektangeln horisontellt (ökar med sw varje gång)
         sr.br.x = sr.tl.x + sw;
         if (sr.br.x > rect->br.x)
           sr.br.x = rect->br.x;
 
-        writeSubRect(sr, pb);
+        writeSubRect(sr, pb, record, file);
+        totalRects++;
       }
     }
-  }
+  } // slut iterera
+    printf("Total number of rectangles processed: %d\n", totalRects);
+    //exit(0);
 }
 
-void EncodeManager::writeSubRect(const Rect& rect, const PixelBuffer *pb)
+void EncodeManager::writeSubRect(const Rect& rect, const PixelBuffer *pb, bool record, FILE* file)
 {
   // fprintf(stderr, "\nEncodeManager::writeSubRect\n");
   // fprintf(stderr, "Rect dimensions: width = %d, height = %d\n", rect.width(), rect.height());
@@ -846,6 +867,11 @@ void EncodeManager::writeSubRect(const Rect& rect, const PixelBuffer *pb)
 
   bool useRLE;
   EncoderType type;
+
+  char encodingChar = ' ';
+  // skapa filen här:
+  
+
 
   // FIXME: This is roughly the algorithm previously used by the Tight
   //        encoder. It seems a bit backwards though, that higher
@@ -896,27 +922,41 @@ void EncodeManager::writeSubRect(const Rect& rect, const PixelBuffer *pb)
 switch (info.palette.size()) {
   case 0:
     type = encoderFullColour;
+    encodingChar = 'F';
     // fprintf(stderr, "Palette size 0, using encoderFullColour\n");
     break;
   case 1:
     type = encoderSolid;
+    encodingChar = 'S';
     // fprintf(stderr, "Palette size 1, using encoderSolid\n");
     break;
   case 2:
-    if (useRLE)
+    if (useRLE) {
       type = encoderBitmapRLE;
-    else {
+      encodingChar = 'R';
+    } else {
       type = encoderBitmap;
+      encodingChar = 'B';
       // fprintf(stderr, "Palette size 2, using %s encoder\n", useRLE ? "encoderBitmapRLE" : "encoderBitmap");
     }
       break;
   default:
-    if (useRLE)
+    if (useRLE) {
       type = encoderIndexedRLE; // kolla om detta blir tight
+      encodingChar = 'I';
+    }
     else {
-        type = encoderIndexed; // kolla om detta blir tight
+      type = encoderIndexed; // kolla om detta blir tight
+      encodingChar = 'T';
       fprintf(stderr, "Palette size > 2, using %s encoder\n", useRLE ? "encoderIndexedRLE" : "encoderIndexed");
     }
+  }
+
+  // Om vi har type 0 => Möjlig ihopslagning ?
+  if (file) {
+    fprintf(file, "%d %d %d %d %c\n",
+            rect.tl.x, rect.tl.y, rect.br.x, rect.br.y, encodingChar);
+    fflush(file); // Ensure immediate write to file
   }
 
   encoder = startRect(rect, type);

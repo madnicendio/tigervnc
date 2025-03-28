@@ -35,6 +35,7 @@ Encoder::Encoder(SConnection *conn_, int encoding_,
   maxPaletteSize(maxPaletteSize_), losslessQuality(losslessQuality_),
   conn(conn_)
 {
+  outputFile = fopen("rects_initial_update2.txt", "w");
 }
 
 Encoder::~Encoder()

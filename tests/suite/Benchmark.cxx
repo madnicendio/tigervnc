@@ -123,7 +123,7 @@ void Benchmark::runBenchmark(EncoderSettings* settings)
 
   // Beräkna total tid
   long double totalWriteRectTime = TightEncoderStats->writeRectEncodetime + TightJPEGEncoderStats->writeRectEncodetime;
-  long double totalNumberOfRects = TightEncoderStats->nRects + TightJPEGEncoderStats->nRects;
+  int totalNumberOfRects = TightEncoderStats->nRects + TightJPEGEncoderStats->nRects;
 
   // Megapixels per sekund
   double tightMPixelsPerSecond = TightEncoderStats->megaPixelsPerSecondRects();
@@ -135,29 +135,31 @@ void Benchmark::runBenchmark(EncoderSettings* settings)
   double jpegCompressionRatio = TightJPEGEncoderStats->compressionRatioRects();
   double totalCompressionRatio = (tightCompressionRatio + jpegCompressionRatio) / 2.0; // Medelvärde
 
-  fprintf(stderr, "+------------------+----------------------+------------------+----------------------+----------------------+\n");
-  fprintf(stderr, "| %-16s | %-20s | %-16s | %-20s | %-20s |\n",
-          "Encoder", "Rect encodetime (ms)", "Number of rects", "MPixels per second", "Compression Ratio");
-  fprintf(stderr, "+------------------+----------------------+------------------+----------------------+----------------------+\n");
+// Skriv ut som en tabell med kortare rubriker
+fprintf(stderr, "+------------+------------+------------+------------+------------+\n");
+fprintf(stderr, "| %-10s | %-10s | %-10s | %-10s | %-10s |\n",
+        "Encoder", "Time (ms)", "# Rects", "MPx/s", "Compr.");
+fprintf(stderr, "+------------+------------+------------+------------+------------+\n");
 
-  fprintf(stderr, "| %-16s | %-20.2Lf | %-16d | %-20.2f | %-20.2f |\n",
-          "TightEncoder",
-          TightEncoderStats->writeRectEncodetime,
-          TightEncoderStats->nRects,
-          tightMPixelsPerSecond,
-          tightCompressionRatio);
+fprintf(stderr, "| %-10s | %-10.2Lf | %-10d | %-10.2f | %-10.2f |\n",
+        "Tight",
+        TightEncoderStats->writeRectEncodetime,
+        TightEncoderStats->nRects,
+        tightMPixelsPerSecond,
+        tightCompressionRatio);
 
-  fprintf(stderr, "| %-16s | %-20.2Lf | %-16d | %-20.2f | %-20.2f |\n",
-          "TightJPEGEncoder",
-          TightJPEGEncoderStats->writeRectEncodetime,
-          TightJPEGEncoderStats->nRects,
-          jpegMPixelsPerSecond,
-          jpegCompressionRatio);
+fprintf(stderr, "| %-10s | %-10.2Lf | %-10d | %-10.2f | %-10.2f |\n",
+        "TightJPEG",
+        TightJPEGEncoderStats->writeRectEncodetime,
+        TightJPEGEncoderStats->nRects,
+        jpegMPixelsPerSecond,
+        jpegCompressionRatio);
 
-  fprintf(stderr, "+------------------+----------------------+------------------+----------------------+----------------------+\n");
-  fprintf(stderr, "| %-16s | %-20.2Lf | %-16Lf | %-20.2f | %-20.2f |\n",
-          "Total", totalWriteRectTime, totalNumberOfRects, totalMPixelsPerSecond, totalCompressionRatio);
-  fprintf(stderr, "+------------------+----------------------+------------------+----------------------+----------------------+\n\n");
+fprintf(stderr, "+------------+------------+------------+------------+------------+\n");
+fprintf(stderr, "| %-10s | %-10.2Lf | %-10d | %-10.2f | %-10.2f |\n",
+        "Total", totalWriteRectTime, totalNumberOfRects, totalMPixelsPerSecond, totalCompressionRatio);
+fprintf(stderr, "+------------+------------+------------+------------+------------+\n\n");
+
 
 
 exit(0);

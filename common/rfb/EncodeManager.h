@@ -21,6 +21,7 @@
 #define __RFB_ENCODEMANAGER_H__
 
 #include <vector>
+#include <cstdio>
 
 #include <stdint.h>
 
@@ -91,7 +92,7 @@ namespace rfb {
     void findSolidRect(const Rect& rect, Region *changed, const PixelBuffer* pb);
     void writeRects(const Region& changed, const PixelBuffer* pb);
 
-    void writeSubRect(const Rect& rect, const PixelBuffer *pb);
+    void writeSubRect(const Rect& rect, const PixelBuffer *pb, bool record, FILE* file);
 
     bool checkSolidTile(const Rect& r, const uint8_t* colourValue,
                         const PixelBuffer *pb);

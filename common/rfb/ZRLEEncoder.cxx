@@ -65,6 +65,8 @@ void ZRLEEncoder::setCompressLevel(int level)
 
 void ZRLEEncoder::writeRect(const PixelBuffer* pb, const Palette& palette)
 {
+  // FILE_DEBUG
+  fprintf(outputFile, "%s", "ZRLE\n");
   int x, y;
   Rect tile;
 
