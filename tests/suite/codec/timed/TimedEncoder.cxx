@@ -5,6 +5,7 @@
 #include <rfb/SConnection.h>
 #include <rfb/EncodeManager.h>
 #include <chrono>
+#include <algorithm>
 
 namespace suite {
 
@@ -55,9 +56,14 @@ void TimedEncoder::writeRect(const rfb::PixelBuffer* pb,
   startWriteRectTimer();
   encoder_->writeRect(pb, palette);
   stopWriteRectTimer(pb);
+  // vet vi här vilken encoder vi har ?
+
+  // Gör en static cast på encoder_ och kolla för TightJPEGEncoder och TightEncoder
+  // Timedencoder ska ha något sätt att ta fram medianstorleken på en rektangel
+
 
   unsigned long long numPixels = static_cast<unsigned long long>(pb->width()) * pb->height();
-
+  rectSizes_.push_back(numPixels);
   stats_->encodedPixels += numPixels;
 }
 
@@ -173,5 +179,20 @@ void TimedEncoder::writeSolidRect(int width, int height,
   {
     return encoder_->getQualityLevel();
   }
+
+
+  unsigned long long TimedEncoder::medianRectSize() const
+  {
+      if (rectSizes_.empty()) {
+          return 0; // Om inga rektanglar har encodats
+      }
+
+      std::vector<unsigned long long> sortedSizes = rectSizes_;
+      size_t mid = sortedSizes.size() / 2;
+      std::nth_element(sortedSizes.begin(), sortedSizes.begin() + mid, sortedSizes.end());
+
+      return sortedSizes[mid]; // Medianen
+  }
+
 }
 

@@ -123,55 +123,65 @@ void Benchmark::runBenchmark(EncoderSettings* settings)
   // Output encoderstats:
   std::vector<rfb::Encoder*> allEncoders = server->manager->getEncoders();
 
-  suite::TimedEncoder* TightEncoder = dynamic_cast<suite::TimedEncoder*>(allEncoders[rfb::encoderTight]);
-  EncoderStats* TightEncoderStats =  TightEncoder->stats();
+  std::vector<std::pair<std::string, suite::TimedEncoder*>> encoders = {
+    {"Tight", dynamic_cast<suite::TimedEncoder*>(allEncoders[rfb::encoderTight])},
+    {"TightJPEG", dynamic_cast<suite::TimedEncoder*>(allEncoders[rfb::encoderTightJPEG])}
+  };
 
-  suite::TimedEncoder* TightJPEGEncoder = dynamic_cast<suite::TimedEncoder*>(allEncoders[rfb::encoderTightJPEG]);
-  EncoderStats* TightJPEGEncoderStats =  TightJPEGEncoder->stats();
+  long double totalWriteRectTime = 0.0;
+  long long unsigned totalEncodedPixels = 0;
+  int totalNumberOfRects = 0;
+  double totalMPixelsPerSecond = 0.0;
+  double totalCompressionRatio = 0.0;
 
-  // Beräkna total tid
-  long double totalWriteRectTime = TightEncoderStats->writeRectEncodetime + TightJPEGEncoderStats->writeRectEncodetime;
-  int totalNumberOfRects = TightEncoderStats->nRects + TightJPEGEncoderStats->nRects;
+  for (size_t i = 0; i < encoders.size(); ++i) {
+    suite::TimedEncoder* encoder = encoders[i].second;
+    if (encoder) {
+        EncoderStats* stats = encoder->stats();
+        totalWriteRectTime += stats->writeRectEncodetime;
+        totalEncodedPixels += stats->encodedPixels;
+        totalNumberOfRects += stats->nRects;
+    }
+}
 
-  // Megapixels per sekund
-  double tightMPixelsPerSecond = TightEncoderStats->megaPixelsPerSecondRects();
-  double jpegMPixelsPerSecond = TightJPEGEncoderStats->megaPixelsPerSecondRects();
-  double totalMPixelsPerSecond = (tightMPixelsPerSecond + jpegMPixelsPerSecond) / 2.0; // Medelvärde
-
-  // Kompressionsförhållande
-  double tightCompressionRatio = TightEncoderStats->compressionRatioRects();
-  double jpegCompressionRatio = TightJPEGEncoderStats->compressionRatioRects();
-  double totalCompressionRatio = (tightCompressionRatio + jpegCompressionRatio) / 2.0; // Medelvärde
-
-  long long unsigned totalEncodedPixels = TightEncoderStats->encodedPixels + TightJPEGEncoderStats->encodedPixels;
-  double tightPercentage = (100.0 * TightEncoderStats->encodedPixels)/totalEncodedPixels;
-  double jpegPercentage = (100.0 * TightJPEGEncoderStats->encodedPixels)/totalEncodedPixels;
-// Skriv ut som en tabell med kortare rubriker
+// Skriv ut tabell
 fprintf(stderr, "+------------+------------+------------+------------+------------+------------+\n");
 fprintf(stderr, "| %-10s | %-10s | %-10s | %-10s | %-10s | %-10s |\n",
         "Encoder", "Time (ms)", "#Pixels %", "# Rects", "MPx/s", "Compr.");
 fprintf(stderr, "+------------+------------+------------+------------+------------+------------+\n");
 
-fprintf(stderr, "| %-10s | %-10.2Lf | %-10.2f | %-10d | %-10.2f | %-10.2f |\n",
-        "Tight",
-        TightEncoderStats->writeRectEncodetime,
-        tightPercentage,
-        TightEncoderStats->nRects,
-        tightMPixelsPerSecond,
-        tightCompressionRatio);
+for (size_t i = 0; i < encoders.size(); ++i) {
+    std::string name = encoders[i].first;
+    suite::TimedEncoder* encoder = encoders[i].second;
+    if (encoder) {
+        EncoderStats* stats = encoder->stats();
+        double percentage = (100.0 * stats->encodedPixels) / totalEncodedPixels;
+        double mpixelsPerSecond = stats->megaPixelsPerSecondRects();
+        double compressionRatio = stats->compressionRatioRects();
 
-fprintf(stderr, "| %-10s | %-10.2Lf | %-10.2f | %-10d | %-10.2f | %-10.2f |\n",
-        "TightJPEG",
-        TightJPEGEncoderStats->writeRectEncodetime,
-        jpegPercentage,
-        TightJPEGEncoderStats->nRects,
-        jpegMPixelsPerSecond,
-        jpegCompressionRatio);
+        fprintf(stderr, "| %-10s | %-10.2Lf | %-10.2f | %-10d | %-10.2f | %-10.2f |\n",
+                name.c_str(),
+                stats->writeRectEncodetime,
+                percentage,
+                stats->nRects,
+                mpixelsPerSecond,
+                compressionRatio);
+
+        totalMPixelsPerSecond += mpixelsPerSecond;
+        totalCompressionRatio += compressionRatio;
+    }
+}
 
 fprintf(stderr, "+------------+------------+------------+------------+------------+------------+\n");
 fprintf(stderr, "| %-10s | %-10.2Lf | %-10llu | %-10d | %-10.2f | %-10.2f |\n",
-        "Total", totalWriteRectTime, totalEncodedPixels, totalNumberOfRects, totalMPixelsPerSecond, totalCompressionRatio);
+        "Total",
+        totalWriteRectTime,
+        totalEncodedPixels,
+        totalNumberOfRects,
+        totalMPixelsPerSecond / encoders.size(),  // Medelvärde
+        totalCompressionRatio / encoders.size()); // Medelvärde
 fprintf(stderr, "+------------+------------+------------+------------+------------+------------+\n\n");
+
 
 
 int criticalFrame = findCriticalFrame(server);

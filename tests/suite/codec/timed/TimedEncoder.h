@@ -131,7 +131,9 @@ namespace suite {
       std::string name = "TimedEncoder::" + std::string(encoder_->getName());
       return name;
  }
+    unsigned long long medianRectSize() const;
 
+    std::vector<unsigned long long> rectSizes_;
 
     uint currentWriteUpdate;
   private:
