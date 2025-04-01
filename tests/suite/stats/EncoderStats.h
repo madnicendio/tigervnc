@@ -31,8 +31,6 @@ namespace suite {
   };
 
   struct EncoderStats {
-    // EncoderStats() { fprintf(stderr, "EncoderStats created\n"); }
-    // ~EncoderStats() { fprintf(stderr, "EncoderStats destroyed\n"); }
 
     long double writeRectEncodetime;
     long double writeSolidRectEncodetime;
@@ -42,6 +40,7 @@ namespace suite {
     unsigned long long outputSizeSolidRects;
     int nRects;
     int nSolidRects;
+    unsigned long long encodedPixels;
     std::string name;
     std::map<int,WriteRects> writeUpdates;  // Encoder::writeRect
 

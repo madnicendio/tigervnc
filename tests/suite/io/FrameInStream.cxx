@@ -88,10 +88,10 @@ if (!image) {
 
     // Debugging output after decoding
 
-    std::cerr << "Decoded image " << imgNr << ": " << "width=" << width
-    << ", height=" << height
-    << ", encodingTime=" << stats.encodingTime
-    << std::endl;
+    // std::cerr << "Decoded image " << imgNr << ": " << "width=" << width
+    // << ", height=" << height
+    // << ", encodingTime=" << stats.encodingTime
+    // << std::endl;
 
     return image;
   }

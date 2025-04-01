@@ -35,6 +35,7 @@ namespace suite {
       .outputSizeSolidRects = 0,
       .nRects = 0,
       .nSolidRects = 0,
+      .encodedPixels = 0,
       .name = suite::enumEncoder::encoderClassName(encoderclass),
       .writeUpdates = std::map<int,WriteRects>{}
     };
@@ -54,6 +55,10 @@ void TimedEncoder::writeRect(const rfb::PixelBuffer* pb,
   startWriteRectTimer();
   encoder_->writeRect(pb, palette);
   stopWriteRectTimer(pb);
+
+  unsigned long long numPixels = static_cast<unsigned long long>(pb->width()) * pb->height();
+
+  stats_->encodedPixels += numPixels;
 }
 
 void TimedEncoder::writeSolidRect(int width, int height,
@@ -64,6 +69,9 @@ void TimedEncoder::writeSolidRect(int width, int height,
   // fprintf(stderr, "TimedEncoder::writeSolidRect\n");
   encoder_->writeSolidRect(width, height, pf, colour);
   stopWriteSolidRectTimer(width, height);
+
+  // unsigned long long numPixels = static_cast<unsigned long long>(width) * height;
+  // stats_->encodedPixels += numPixels;
 }
 
   void TimedEncoder::startWriteRectTimer()

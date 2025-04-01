@@ -38,6 +38,9 @@ namespace suite {
     static EncoderSettings encoderSettings(rfb::EncoderClass encoderClass,
                                            PseudoEncodingLevel quality = NONE,
                                            PseudoEncodingLevel compression = TWO);
+
+    int findCriticalFrame(Server* server);
+
   };
 }
 #endif // __SUITE_BENCHMARK_H__

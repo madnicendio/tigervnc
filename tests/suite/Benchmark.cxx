@@ -90,6 +90,8 @@ void Benchmark::runBenchmark(EncoderSettings* settings)
   std::cout << "Starting benchmark using \"" << filename_ << "\"\n";
   RecorderStats recorderStats;
   int imageNr = 0;
+  // double maxEncodingTime = 0.0;
+  // int mostCriticalFrame = -1;
   while (file.peek() != EOF) {
     imageNr++;
     // Extract the next image from the file
@@ -101,6 +103,12 @@ void Benchmark::runBenchmark(EncoderSettings* settings)
     // Immediately after loading, the server's output buffer is cleared
     // to be ready for the next image
     server->out->clear();
+
+    // Check if this frame has the longest encoding time
+    // if (imageNr != 1 && image->stats_.encodingTime > maxEncodingTime) {
+    //     maxEncodingTime = image->stats_.encodingTime;
+    //     mostCriticalFrame = imageNr;
+    // }
 
 
 #ifdef _DEBUG
@@ -135,30 +143,56 @@ void Benchmark::runBenchmark(EncoderSettings* settings)
   double jpegCompressionRatio = TightJPEGEncoderStats->compressionRatioRects();
   double totalCompressionRatio = (tightCompressionRatio + jpegCompressionRatio) / 2.0; // Medelvärde
 
+  long long unsigned totalEncodedPixels = TightEncoderStats->encodedPixels + TightJPEGEncoderStats->encodedPixels;
+  double tightPercentage = (100.0 * TightEncoderStats->encodedPixels)/totalEncodedPixels;
+  double jpegPercentage = (100.0 * TightJPEGEncoderStats->encodedPixels)/totalEncodedPixels;
 // Skriv ut som en tabell med kortare rubriker
-fprintf(stderr, "+------------+------------+------------+------------+------------+\n");
-fprintf(stderr, "| %-10s | %-10s | %-10s | %-10s | %-10s |\n",
-        "Encoder", "Time (ms)", "# Rects", "MPx/s", "Compr.");
-fprintf(stderr, "+------------+------------+------------+------------+------------+\n");
+fprintf(stderr, "+------------+------------+------------+------------+------------+------------+\n");
+fprintf(stderr, "| %-10s | %-10s | %-10s | %-10s | %-10s | %-10s |\n",
+        "Encoder", "Time (ms)", "#Pixels %", "# Rects", "MPx/s", "Compr.");
+fprintf(stderr, "+------------+------------+------------+------------+------------+------------+\n");
 
-fprintf(stderr, "| %-10s | %-10.2Lf | %-10d | %-10.2f | %-10.2f |\n",
+fprintf(stderr, "| %-10s | %-10.2Lf | %-10.2f | %-10d | %-10.2f | %-10.2f |\n",
         "Tight",
         TightEncoderStats->writeRectEncodetime,
+        tightPercentage,
         TightEncoderStats->nRects,
         tightMPixelsPerSecond,
         tightCompressionRatio);
 
-fprintf(stderr, "| %-10s | %-10.2Lf | %-10d | %-10.2f | %-10.2f |\n",
+fprintf(stderr, "| %-10s | %-10.2Lf | %-10.2f | %-10d | %-10.2f | %-10.2f |\n",
         "TightJPEG",
         TightJPEGEncoderStats->writeRectEncodetime,
+        jpegPercentage,
         TightJPEGEncoderStats->nRects,
         jpegMPixelsPerSecond,
         jpegCompressionRatio);
 
-fprintf(stderr, "+------------+------------+------------+------------+------------+\n");
-fprintf(stderr, "| %-10s | %-10.2Lf | %-10d | %-10.2f | %-10.2f |\n",
-        "Total", totalWriteRectTime, totalNumberOfRects, totalMPixelsPerSecond, totalCompressionRatio);
-fprintf(stderr, "+------------+------------+------------+------------+------------+\n\n");
+fprintf(stderr, "+------------+------------+------------+------------+------------+------------+\n");
+fprintf(stderr, "| %-10s | %-10.2Lf | %-10llu | %-10d | %-10.2f | %-10.2f |\n",
+        "Total", totalWriteRectTime, totalEncodedPixels, totalNumberOfRects, totalMPixelsPerSecond, totalCompressionRatio);
+fprintf(stderr, "+------------+------------+------------+------------+------------+------------+\n\n");
+
+
+int criticalFrame = findCriticalFrame(server);
+if (criticalFrame != -1) {
+    const ManagerStats& stats = server->stats();
+    const WriteUpdate& update = stats.writeUpdateStats[criticalFrame - 1];
+
+    // Print header
+    fprintf(stderr, "\nMost Critical Frame:\n");
+    fprintf(stderr, "+------------+------------+------------+\n");
+    fprintf(stderr, "| Frame Nr   | Time (ms)  | #Pixels    |\n");
+    fprintf(stderr, "+------------+------------+------------+\n");
+
+    // Print the critical frame details
+    fprintf(stderr, "| %-10d | %-10.2f | %-10u |\n",
+            criticalFrame, update.timeSpent, update.size);
+
+    fprintf(stderr, "+------------+------------+------------+\n");
+} else {
+    std::cout << "No frames processed." << std::endl;
+}
 
 
 
@@ -233,4 +267,24 @@ EncoderSettings Benchmark::encoderSettings(rfb::EncoderClass encoderClass,
     throw std::logic_error("EncoderClass not implemented");
   }
   return settings;
+}
+
+int Benchmark::findCriticalFrame(Server* server) {
+  const ManagerStats& stats = server->stats();
+
+  // Variabler för att hålla reda på den mest kritiska ramen
+  double maxTimeSpent = 0.0;
+  int criticalFrame = -1;
+
+  // Gå igenom alla uppdateringar och hitta den med största timeSpent
+  for (size_t i = 0; i < stats.writeUpdateStats.size(); ++i) {
+      const WriteUpdate& update = stats.writeUpdateStats[i];
+      if (update.timeSpent > maxTimeSpent) {
+          maxTimeSpent = update.timeSpent;
+          criticalFrame = i;
+      }
+  }
+
+  // Because currentWriteUpdate isn't zero-indexed
+  return criticalFrame+1;
 }

@@ -117,6 +117,11 @@ namespace suite {
       .size = getArea(ui.changed),
     };
     stats_.addWriteUpdate(update);
+
+    if (pb) {
+        fprintf(stderr, "Decoded write update %d: size=%d, encoding time=%.4f ms\n",
+                currentWriteUpdate, update.size, update.timeSpent);
+    }
   }
 
 
