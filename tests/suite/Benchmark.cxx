@@ -131,6 +131,7 @@ void Benchmark::runBenchmark(EncoderSettings* settings)
   long double totalWriteRectTime = 0.0;
   long long unsigned totalEncodedPixels = 0;
   int totalNumberOfRects = 0;
+  long long unsigned totalMedianRectSize = 0;
   double totalMPixelsPerSecond = 0.0;
   double totalCompressionRatio = 0.0;
 
@@ -141,14 +142,15 @@ void Benchmark::runBenchmark(EncoderSettings* settings)
         totalWriteRectTime += stats->writeRectEncodetime;
         totalEncodedPixels += stats->encodedPixels;
         totalNumberOfRects += stats->nRects;
+        totalMedianRectSize += encoder->medianRectSize();
     }
 }
 
 // Skriv ut tabell
-fprintf(stderr, "+------------+------------+------------+------------+------------+------------+\n");
-fprintf(stderr, "| %-10s | %-10s | %-10s | %-10s | %-10s | %-10s |\n",
-        "Encoder", "Time (ms)", "#Pixels %", "# Rects", "MPx/s", "Compr.");
-fprintf(stderr, "+------------+------------+------------+------------+------------+------------+\n");
+fprintf(stderr, "+------------+------------+------------+------------+------------+------------+------------+\n");
+fprintf(stderr, "| %-10s | %-10s | %-10s | %-10s | %-10s | %-10s | %-10s |\n",
+        "Encoder", "Time (ms)", "#Pixels %", "# Rects", "MedianRect", "MPx/s", "Compr.");
+fprintf(stderr, "+------------+------------+------------+------------+------------+------------+------------+\n");
 
 for (size_t i = 0; i < encoders.size(); ++i) {
     std::string name = encoders[i].first;
@@ -158,12 +160,14 @@ for (size_t i = 0; i < encoders.size(); ++i) {
         double percentage = (100.0 * stats->encodedPixels) / totalEncodedPixels;
         double mpixelsPerSecond = stats->megaPixelsPerSecondRects();
         double compressionRatio = stats->compressionRatioRects();
+        long long unsigned medianRectSize = encoder->medianRectSize();
 
-        fprintf(stderr, "| %-10s | %-10.2Lf | %-10.2f | %-10d | %-10.2f | %-10.2f |\n",
+        fprintf(stderr, "| %-10s | %-10.2Lf | %-10.2f | %-10d | %-10llu | %-10.2f | %-10.2f |\n",
                 name.c_str(),
                 stats->writeRectEncodetime,
                 percentage,
                 stats->nRects,
+                medianRectSize,
                 mpixelsPerSecond,
                 compressionRatio);
 
@@ -172,16 +176,16 @@ for (size_t i = 0; i < encoders.size(); ++i) {
     }
 }
 
-fprintf(stderr, "+------------+------------+------------+------------+------------+------------+\n");
-fprintf(stderr, "| %-10s | %-10.2Lf | %-10llu | %-10d | %-10.2f | %-10.2f |\n",
+fprintf(stderr, "+------------+------------+------------+------------+------------+------------+------------+\n");
+fprintf(stderr, "| %-10s | %-10.2Lf | %-10llu | %-10d | %-10llu | %-10.2f | %-10.2f |\n",
         "Total",
         totalWriteRectTime,
         totalEncodedPixels,
         totalNumberOfRects,
+        totalMedianRectSize / encoders.size(),  // Medelvärde
         totalMPixelsPerSecond / encoders.size(),  // Medelvärde
         totalCompressionRatio / encoders.size()); // Medelvärde
-fprintf(stderr, "+------------+------------+------------+------------+------------+------------+\n\n");
-
+fprintf(stderr, "+------------+------------+------------+------------+------------+------------+------------+\n\n");
 
 
 int criticalFrame = findCriticalFrame(server);
