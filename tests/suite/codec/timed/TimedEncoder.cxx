@@ -55,7 +55,6 @@ void TimedEncoder::writeRect(const rfb::PixelBuffer* pb,
                              const rfb::Palette& palette)
 {
   startWriteRectTimer();
-  fprintf(stderr, "SubRect palette size: %d\n", palette.size());
 
   encoder_->writeRect(pb, palette);
   stopWriteRectTimer(pb);

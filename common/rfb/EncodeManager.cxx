@@ -872,14 +872,10 @@ void EncodeManager::writeRects(const Region& changed, const PixelBuffer* pb)
     determineRectEncoding(*subRect, pb);
   }
   // Här kan vi kolla på att slå ihop
-  fprintf(stderr, "\n\n");
+  fprintf(stderr, "\n");
 
   // Här smäller det på första subrektangeln
   for (rfb::SubRect*  subRect : subRects) {
-    fprintf(stderr, "WriteSubRect with Rect: (%d, %d) %dx%d\n",
-          subRect->rect.tl.x, subRect->rect.tl.y,
-          subRect->rect.width(), subRect->rect.height());
-
     writeSubRect(*subRect, pb);
   }
 
@@ -978,7 +974,6 @@ void EncodeManager::writeSubRect( rfb::SubRect& subrect, const PixelBuffer *pb)
   encoder = startRect(subrect.rect, subrect.encoderType);
 
   if (encoder->flags & EncoderUseNativePF) {
-    fprintf(stderr, "Flags\n"); // Borde vi gått in här på första?
     subrect.ppb = preparePixelBuffer(subrect.rect, pb, false);
   } else {
     subrect.ppb = preparePixelBuffer(subrect.rect, pb, true);
@@ -1142,11 +1137,6 @@ PixelBuffer* EncodeManager::preparePixelBuffer(const Rect& rect,
   offsetPixelBuffer.update(pb->getPF(), rect.width(), rect.height(),
                            buffer, stride);
 
-  fprintf(stderr, "[preparePixelBuffer] Offset buffer rect: (%d, %d) %dx%d\n",
-        offsetPixelBuffer.getRect().tl.x,
-        offsetPixelBuffer.getRect().tl.y,
-        offsetPixelBuffer.getRect().width(),
-        offsetPixelBuffer.getRect().height());
 
   return &offsetPixelBuffer;
 }

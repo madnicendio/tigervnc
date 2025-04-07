@@ -94,7 +94,9 @@ void Benchmark::runBenchmark(EncoderSettings* settings)
   // int mostCriticalFrame = -1;
   while (file.peek() != EOF) {
     imageNr++;
-    fprintf(stderr, "Image number: %d\n", imageNr);
+    fprintf(stderr, "\n");
+    fprintf(stderr, "=========================[ Image %d ]=========================\n", imageNr);
+
     // Extract the next image from the file
     // This function uses recorderStats to record information
     const Image* image = is.readImage(file, recorderStats, imageNr);
@@ -117,7 +119,8 @@ void Benchmark::runBenchmark(EncoderSettings* settings)
 #endif // _DEBUG
     delete image;
   }
-  std::cout << "Benchmarking complete!\n\n\n";
+  fprintf(stderr, "\n");
+    fprintf(stderr, "==========================================[ STATS: ]=========================================\n\n");
 
   // Print statistics for the single server
 
@@ -195,7 +198,7 @@ if (criticalFrame != -1) {
     const WriteUpdate& update = stats.writeUpdateStats[criticalFrame - 1];
 
     // Print header
-    fprintf(stderr, "\nMost Critical Frame:\n");
+    fprintf(stderr, "\n==========================[ Most Critical Frame ]==========================\n\n");
     fprintf(stderr, "+------------+------------+------------+\n");
     fprintf(stderr, "| Frame Nr   | Time (ms)  | #Pixels    |\n");
     fprintf(stderr, "+------------+------------+------------+\n");
