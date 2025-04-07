@@ -24,6 +24,7 @@
 #endif
 
 #include <stdlib.h>
+#include <algorithm>
 
 #include <rfb/EncodeManager.h>
 #include <rfb/Encoder.h>
@@ -867,14 +868,75 @@ void EncodeManager::writeRects(const Region& changed, const PixelBuffer* pb)
     }
   }
 
-  // bestäm encoding
+  // Bestäm encoding
   for (rfb::SubRect* subRect : subRects) {
     determineRectEncoding(*subRect, pb);
   }
-  // Här kan vi kolla på att slå ihop
-  fprintf(stderr, "\n");
+  // Här kan vi slå ihop subrektanglar
+  // fprintf(stderr, "\n");
 
-  // Här smäller det på första subrektangeln
+  // Merge vertically
+
+  // Sortera på x och sedan y för att hitta alla i samma kolumn så att vi enkelt kan kolla om nästa rektangel ligger direkt nedanför
+  int fullColourBefore = 0;
+  for (const auto* r : subRects) {
+    if (r->encoderType == rfb::EncoderType::encoderFullColour)
+        ++fullColourBefore;
+    }
+
+  std::vector<rfb::SubRect*> merged;
+  std::sort(subRects.begin(), subRects.end(), [](rfb::SubRect* a, rfb::SubRect* b) {
+      if (a->rect.tl.x != b->rect.tl.x) {
+          return a->rect.tl.x < b->rect.tl.x;
+      }
+      return a->rect.tl.y < b->rect.tl.y;
+  });
+  int coalesced = 0;
+  for (size_t i = 0; i < subRects.size(); ++i) {
+    rfb::SubRect* current = subRects[i];
+    if (current->encoderType == rfb::EncoderType::encoderFullColour) {
+      // Rect base = current->rect;
+
+      // Gå uppifrån och ned och försök växa
+      while (i+1 < subRects.size()) {
+        rfb::SubRect* next = subRects[i+1];
+        const Rect& r1 = current->rect;
+        const Rect& r2 = next->rect;
+
+        bool sameColumn = (r1.tl.x == r2.tl.x) && (r1.br.x == r2.br.x);
+        bool verticallyAdjacent = (r1.br.y == r2.tl.y);
+        bool sameEncoding = (current->encoderType == next->encoderType);
+
+        if (sameColumn && verticallyAdjacent && sameEncoding) {
+            // coalEsce
+            current->rect.br.y = next->rect.br.y;
+            delete next;
+            ++coalesced;
+            ++i; // hoppa över nästa
+        } else {
+            break;
+        }
+      }
+    }
+    merged.push_back(current);
+  }
+  int fullColourAfter = 0;
+
+  for (const auto* r : merged) {
+    if (r->encoderType == rfb::EncoderType::encoderFullColour)
+        ++fullColourAfter;
+  }
+  int mergedRects = fullColourBefore - fullColourAfter;
+
+
+  subRects = std::move(merged);
+  fprintf(stderr, "  FullColour subrects before merge: %d\n", fullColourBefore);
+  fprintf(stderr, "  FullColour subrects after merge : %d\n", fullColourAfter);
+  fprintf(stderr, "  Merged: %d (%.1f%% reduction)\n",
+          mergedRects,
+          fullColourBefore > 0 ? (100.0 * mergedRects / fullColourBefore) : 0.0);
+
+  // Encoding
   for (rfb::SubRect*  subRect : subRects) {
     writeSubRect(*subRect, pb);
   }
