@@ -4,6 +4,7 @@
 #include <rfb/PixelBuffer.h>
 #include <rfb/SConnection.h>
 #include <rfb/EncodeManager.h>
+#include <rfb/Palette.h>
 #include <chrono>
 #include <algorithm>
 
@@ -54,6 +55,8 @@ void TimedEncoder::writeRect(const rfb::PixelBuffer* pb,
                              const rfb::Palette& palette)
 {
   startWriteRectTimer();
+  fprintf(stderr, "SubRect palette size: %d\n", palette.size());
+
   encoder_->writeRect(pb, palette);
   stopWriteRectTimer(pb);
   // vet vi här vilken encoder vi har ?

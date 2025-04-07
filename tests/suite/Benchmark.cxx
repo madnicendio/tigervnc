@@ -94,6 +94,7 @@ void Benchmark::runBenchmark(EncoderSettings* settings)
   // int mostCriticalFrame = -1;
   while (file.peek() != EOF) {
     imageNr++;
+    fprintf(stderr, "Image number: %d\n", imageNr);
     // Extract the next image from the file
     // This function uses recorderStats to record information
     const Image* image = is.readImage(file, recorderStats, imageNr);

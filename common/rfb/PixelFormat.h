@@ -112,7 +112,6 @@ namespace rfb {
     // In practice we are always in true colour mode.
     bool trueColour;
 
-  protected:
     bool bigEndian;
     int redMax;
     int greenMax;

@@ -357,6 +357,10 @@ void FullFramePixelBuffer::commitBufferRW(const Rect& /*r*/)
 
 const uint8_t* FullFramePixelBuffer::getBuffer(const Rect& r, int* stride_) const
 {
+
+// fprintf(stderr, "getBuffer called with Rect: (%d,%d) %dx%d\n", r.tl.x, r.tl.y, r.width(), r.height());
+// fprintf(stderr, " Full buffer size: %dx%d\n", width(), height());
+
   if (!r.enclosed_by(getRect()))
     throw std::out_of_range(rfb::format("Pixel buffer request %dx%d at %d,%d exceeds framebuffer %dx%d",
                                         r.width(), r.height(),

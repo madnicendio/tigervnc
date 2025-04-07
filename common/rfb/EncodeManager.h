@@ -49,6 +49,8 @@ namespace rfb {
 
   struct RectInfo;
 
+  struct SubRect;
+
   class EncodeManager : public Timer::Callback {
   public:
     EncodeManager(SConnection* conn);
@@ -91,8 +93,10 @@ namespace rfb {
     void writeSolidRects(Region *changed, const PixelBuffer* pb);
     void findSolidRect(const Rect& rect, Region *changed, const PixelBuffer* pb);
     void writeRects(const Region& changed, const PixelBuffer* pb);
+    void determineRectEncoding(rfb::SubRect& subrect, const PixelBuffer *pb);
 
-    void writeSubRect(const Rect& rect, const PixelBuffer *pb, bool record, FILE* file);
+
+    void writeSubRect(rfb::SubRect& subrect, const PixelBuffer *pb);
 
     bool checkSolidTile(const Rect& r, const uint8_t* colourValue,
                         const PixelBuffer *pb);
@@ -124,6 +128,8 @@ namespace rfb {
 
     std::vector<Encoder*> encoders;
     std::vector<int> activeEncoders;
+
+    std::vector<rfb::SubRect*> subRects;
 
     Region lossyRegion;
     Region recentlyChangedRegion;

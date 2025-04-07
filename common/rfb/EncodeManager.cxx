@@ -71,11 +71,22 @@ enum EncoderType {
   encoderIndexedRLE,
   encoderFullColour,
   encoderTypeMax,
+  UNKNOWN
 };
 
 struct RectInfo {
   int rleRuns;
   Palette palette;
+};
+
+struct SubRect {
+    Rect rect;
+    EncoderType encoderType;
+    Encoder* encoder;
+    PixelBuffer* ppb = nullptr;
+    RectInfo info;
+
+    SubRect(const Rect& r, EncoderType enc) : rect(r), encoderType(enc), encoder(nullptr) {}
 };
 
 };
@@ -800,15 +811,15 @@ void EncodeManager::writeRects(const Region& changed, const PixelBuffer* pb)
 
   // Vi hämtar rektanglar från changed?
   changed.get_rects(&rects);  // kolla vidare här
-  fprintf(stderr, "Number of rectangles from get_rect: %ld\n", rects.size());
+  // fprintf(stderr, "Number of rectangles from get_rect: %ld\n", rects.size());
   int totalRects = 0;
   bool record = false;
   FILE* file = nullptr;
 
-  if (rects.size() == 7) {
-    //record = true;
-    file = fopen("rects_initial_update.txt", "w"); // Spara rektanglar till en fil
-  }
+  // if (rects.size() == 7) {
+  //   //record = true;
+  //   file = fopen("rects_initial_update.txt", "w"); // Spara rektanglar till en fil
+  // }
 
   for (rect = rects.begin(); rect != rects.end(); ++rect) { // iterera över alla rects
     int w, h, sw, sh;
@@ -819,7 +830,10 @@ void EncodeManager::writeRects(const Region& changed, const PixelBuffer* pb)
 
     // No split necessary?
     if (((w*h) < SubRectMaxArea) && (w < SubRectMaxWidth)) {
-      writeSubRect(*rect, pb, record, file); // Vi behandlar rektangeln direkt
+      // writeSubRect(*rect, pb, record, file); // Vi behandlar rektangeln direkt
+      subRects.push_back(new rfb::SubRect{*rect, EncoderType::UNKNOWN});  // Lägg till subrect
+      // fprintf(stderr, "Storing SubRect at %p\n", (void*)&subRects.back());
+
       totalRects++;
       continue;
     }
@@ -845,39 +859,52 @@ void EncodeManager::writeRects(const Region& changed, const PixelBuffer* pb)
         if (sr.br.x > rect->br.x)
           sr.br.x = rect->br.x;
 
-        writeSubRect(sr, pb, record, file);
+        subRects.push_back(new rfb::SubRect{*rect, EncoderType::UNKNOWN});  // Lägg till subrect
+        // writeSubRect(sr, pb, record, file);
+        // fprintf(stderr, "Storing SubRect at %p\n", (void*)&subRects.back());
+
         totalRects++;
       }
     }
-  } // slut iterera
-    printf("Total number of rectangles processed: %d\n", totalRects);
-    //exit(0);
+  }
+
+  // bestäm encoding
+  for (rfb::SubRect* subRect : subRects) {
+    //fprintf(stderr, "determineRectEncoding SubRect with Rect: (%d, %d) %dx%d\n",
+          // subRect->rect.tl.x, subRect->rect.tl.y,
+          // subRect->rect.width(), subRect->rect.height();
+    determineRectEncoding(*subRect, pb);
+  }
+  // Här kan vi kolla på att slå ihop
+
+
+  // Vi får se om det smäller här
+  for (rfb::SubRect*  subRect : subRects) {
+    fprintf(stderr, "WriteSubRect with Rect: (%d, %d) %dx%d\n",
+          subRect->rect.tl.x, subRect->rect.tl.y,
+          subRect->rect.width(), subRect->rect.height());
+
+    writeSubRect(*subRect, pb);
+  }
+
+  // exit(0);
+
+  subRects.clear();
+
 }
 
-void EncodeManager::writeSubRect(const Rect& rect, const PixelBuffer *pb, bool record, FILE* file)
-{
-  // fprintf(stderr, "\nEncodeManager::writeSubRect\n");
-  // fprintf(stderr, "Rect dimensions: width = %d, height = %d\n", rect.width(), rect.height());
-  PixelBuffer *ppb;
+void EncodeManager::determineRectEncoding(rfb::SubRect& subrect, const PixelBuffer *pb) {
+  // PixelBuffer *ppb;
 
   Encoder *encoder;
 
-  struct RectInfo info;
+  //struct RectInfo info; // används för att ta beslut
   unsigned int divisor, maxColours;
 
   bool useRLE;
   EncoderType type;
+  // Rect rect = subrect.rect;
 
-  char encodingChar = ' ';
-  // skapa filen här:
-  
-
-
-  // FIXME: This is roughly the algorithm previously used by the Tight
-  //        encoder. It seems a bit backwards though, that higher
-  //        compression setting means spending less effort in building
-  //        a palette. It might be that they figured the increase in
-  //        zlib setting compensated for the loss.
   if (conn->client.compressLevel == -1)
     divisor = 2 * 8;
   else
@@ -885,7 +912,7 @@ void EncodeManager::writeSubRect(const Rect& rect, const PixelBuffer *pb, bool r
   if (divisor < 4)
     divisor = 4;
 
-  maxColours = rect.area()/divisor;
+  maxColours = subrect.rect.area()/divisor;
 
   // Special exception inherited from the Tight encoder
   if (activeEncoders[encoderFullColour] == encoderTightJPEG) {
@@ -899,72 +926,81 @@ void EncodeManager::writeSubRect(const Rect& rect, const PixelBuffer *pb, bool r
   if (maxColours < 2)
     maxColours = 2;
 
-  encoder = encoders[activeEncoders[encoderIndexedRLE]];
-  if (maxColours > encoder->maxPaletteSize)
-    maxColours = encoder->maxPaletteSize;
-  encoder = encoders[activeEncoders[encoderIndexed]];
-  if (maxColours > encoder->maxPaletteSize)
-    maxColours = encoder->maxPaletteSize;
+  subrect.encoder = encoders[activeEncoders[encoderIndexedRLE]];
+  if (maxColours > subrect.encoder->maxPaletteSize)
+    maxColours = subrect.encoder->maxPaletteSize;
+  subrect.encoder = encoders[activeEncoders[encoderIndexed]];
+  if (maxColours > subrect.encoder->maxPaletteSize)
+    maxColours = subrect.encoder->maxPaletteSize;
 
   // fprintf(stderr, "Final maxColours: %u\n", maxColours);
-  ppb = preparePixelBuffer(rect, pb, true);
+  PixelBuffer* tempPpb = preparePixelBuffer(subrect.rect, pb, true);
 
-  if (!analyseRect(ppb, &info, maxColours)) {
+  if (!analyseRect(tempPpb, &subrect.info, maxColours)) {
     // fprintf(stderr, "Failed to analyze rectangle\n");
-    info.palette.clear();
+    subrect.info.palette.clear();
   }
 
   // Different encoders might have different RLE overhead, but
   // here we do a guess at RLE being the better choice if reduces
   // the pixel count by 50%.
-  useRLE = info.rleRuns <= (rect.area() * 2);
+  useRLE = subrect.info.rleRuns <= (subrect.rect.area() * 2);
 
-switch (info.palette.size()) {
+switch (subrect.info.palette.size()) {
   case 0:
     type = encoderFullColour;
-    encodingChar = 'F';
-    // fprintf(stderr, "Palette size 0, using encoderFullColour\n");
+    fprintf(stderr, "subrect.encoderType = encoderFullColour\n");
     break;
   case 1:
     type = encoderSolid;
-    encodingChar = 'S';
-    // fprintf(stderr, "Palette size 1, using encoderSolid\n");
+    fprintf(stderr, "subrect.encoderType = encoderSolid\n");
     break;
   case 2:
+    fprintf(stderr, "subrect.encoderType = encoderBitmap\n");
     if (useRLE) {
       type = encoderBitmapRLE;
-      encodingChar = 'R';
     } else {
       type = encoderBitmap;
-      encodingChar = 'B';
-      // fprintf(stderr, "Palette size 2, using %s encoder\n", useRLE ? "encoderBitmapRLE" : "encoderBitmap");
     }
       break;
   default:
     if (useRLE) {
       type = encoderIndexedRLE; // kolla om detta blir tight
-      encodingChar = 'I';
     }
     else {
       type = encoderIndexed; // kolla om detta blir tight
-      encodingChar = 'T';
       fprintf(stderr, "Palette size > 2, using %s encoder\n", useRLE ? "encoderIndexedRLE" : "encoderIndexed");
     }
   }
+  subrect.encoderType = type;
+}
 
-  // Om vi har type 0 => Möjlig ihopslagning ?
-  if (file) {
-    fprintf(file, "%d %d %d %d %c\n",
-            rect.tl.x, rect.tl.y, rect.br.x, rect.br.y, encodingChar);
-    fflush(file); // Ensure immediate write to file
+void EncodeManager::writeSubRect( rfb::SubRect& subrect, const PixelBuffer *pb)
+{
+  // fprintf(stderr, "\nEncodeManager::writeSubRect\n");
+  // fprintf(stderr, "Rect dimensions: width = %d, height = %d\n", rect.width(), rect.height());
+
+  Encoder *encoder;
+
+  // struct RectInfo info;
+
+  subrect.encoder = startRect(subrect.rect, subrect.encoderType);
+
+  if (subrect.encoder->flags & EncoderUseNativePF) {
+    fprintf(stderr, "Flags\n"); // Borde vi gått in här på första?
+    subrect.ppb = preparePixelBuffer(subrect.rect, pb, false);
+  } else {
+    subrect.ppb = preparePixelBuffer(subrect.rect, pb, true);
   }
+  fprintf(stderr, "Inside WriteSubRect with Rect: (%d, %d) %dx%d\n",
+          subrect.rect.tl.x, subrect.rect.tl.y,
+          subrect.rect.width(), subrect.rect.height());
 
-  encoder = startRect(rect, type);
+  fprintf(stderr, "SubRect palette size: %d\n", subrect.info.palette.size());
 
-  if (encoder->flags & EncoderUseNativePF)
-    ppb = preparePixelBuffer(rect, pb, false);
+    //fprintf(stderr, "palette = %d\n", subrect.info.palette.getColour());
 
-  encoder->writeRect(ppb, info.palette);
+  subrect.encoder->writeRect(subrect.ppb, subrect.info.palette);
 
   endRect();
 }
@@ -1095,8 +1131,17 @@ PixelBuffer* EncodeManager::preparePixelBuffer(const Rect& rect,
 {
   const uint8_t* buffer;
   int stride;
+  // fprintf(stderr, "Client PF Address: %p\n", &conn->client.pf());
+  // const rfb::PixelFormat& pf = conn->client.pf();
+  // fprintf(stderr, "Client PF Address: %p\n", (void*)&pf);
+  // fprintf(stderr, "Client PF: bpp=%d, depth=%d, trueColour=%d\n", pf.bpp, pf.depth, pf.trueColour);
+  // fprintf(stderr, "Created SubRect with Rect: (%d, %d) %dx%d\n", rect.tl.x, rect.tl.y, rect.width(), rect.height());
+
+
+
 
   // Do wo need to convert the data?
+  /* Is the pixel format different from the expected */
   if (convert && conn->client.pf() != pb->getPF()) {
     convertedPixelBuffer.setPF(conn->client.pf());
     convertedPixelBuffer.setSize(rect.width(), rect.height());
@@ -1116,6 +1161,12 @@ PixelBuffer* EncodeManager::preparePixelBuffer(const Rect& rect,
 
   offsetPixelBuffer.update(pb->getPF(), rect.width(), rect.height(),
                            buffer, stride);
+
+  fprintf(stderr, "[preparePixelBuffer] Offset buffer rect: (%d, %d) %dx%d\n",
+        offsetPixelBuffer.getRect().tl.x,
+        offsetPixelBuffer.getRect().tl.y,
+        offsetPixelBuffer.getRect().width(),
+        offsetPixelBuffer.getRect().height());
 
   return &offsetPixelBuffer;
 }
