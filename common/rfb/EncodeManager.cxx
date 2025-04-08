@@ -883,7 +883,7 @@ void EncodeManager::writeRects(const Region& changed, const PixelBuffer* pb)
     if (r->encoderType == rfb::EncoderType::encoderFullColour)
         ++fullColourBefore;
     }
-
+  const int MaxMergeArea = SubRectMaxArea;
   std::vector<rfb::SubRect*> merged;
   std::sort(subRects.begin(), subRects.end(), [](rfb::SubRect* a, rfb::SubRect* b) {
       if (a->rect.tl.x != b->rect.tl.x) {
@@ -906,8 +906,11 @@ void EncodeManager::writeRects(const Region& changed, const PixelBuffer* pb)
         bool sameColumn = (r1.tl.x == r2.tl.x) && (r1.br.x == r2.br.x);
         bool verticallyAdjacent = (r1.br.y == r2.tl.y);
         bool sameEncoding = (current->encoderType == next->encoderType);
+        int mergedHeight = r2.br.y - r1.tl.y;
+        int width = r1.br.x - r1.tl.x;
+        bool withinAreaLimit = (width * mergedHeight) <= MaxMergeArea;
 
-        if (sameColumn && verticallyAdjacent && sameEncoding) {
+        if (sameColumn && verticallyAdjacent && sameEncoding && withinAreaLimit) {
             // coalEsce
             current->rect.br.y = next->rect.br.y;
             delete next;
