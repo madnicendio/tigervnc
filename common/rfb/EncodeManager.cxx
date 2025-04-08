@@ -930,11 +930,11 @@ void EncodeManager::writeRects(const Region& changed, const PixelBuffer* pb)
 
 
   subRects = std::move(merged);
-  fprintf(stderr, "  FullColour subrects before merge: %d\n", fullColourBefore);
-  fprintf(stderr, "  FullColour subrects after merge : %d\n", fullColourAfter);
-  fprintf(stderr, "  Merged: %d (%.1f%% reduction)\n",
-          mergedRects,
-          fullColourBefore > 0 ? (100.0 * mergedRects / fullColourBefore) : 0.0);
+  // fprintf(stderr, "  FullColour subrects before merge: %d\n", fullColourBefore);
+  // fprintf(stderr, "  FullColour subrects after merge : %d\n", fullColourAfter);
+  // fprintf(stderr, "  Merged: %d (%.1f%% reduction)\n",
+  //         mergedRects,
+  //         fullColourBefore > 0 ? (100.0 * mergedRects / fullColourBefore) : 0.0);
 
   // Encoding
   for (rfb::SubRect*  subRect : subRects) {

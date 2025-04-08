@@ -118,10 +118,10 @@ namespace suite {
     };
     stats_.addWriteUpdate(update);
 
-    if (pb) {
-        fprintf(stderr, "Decoded write update %d: size=%d, encoding time=%.4f ms\n",
-                currentWriteUpdate, update.size, update.timeSpent);
-    }
+    // if (pb) {
+    //     fprintf(stderr, "Decoded write update %d: size=%d, encoding time=%.4f ms\n",
+    //             currentWriteUpdate, update.size, update.timeSpent);
+    // }
   }
 
 
