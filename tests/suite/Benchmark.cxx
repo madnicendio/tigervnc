@@ -191,10 +191,26 @@ fprintf(stderr, "| %-10s | %-10.2Lf | %-10llu | %-10d | %-10llu | %-10.2f | %-10
         totalCompressionRatio / encoders.size()); // Medelvärde
 fprintf(stderr, "+------------+------------+------------+------------+------------+------------+------------+\n\n");
 
+// Ta fram hur lång tid en total frame update tar
+const ManagerStats& stats = server->stats();
+std::vector<WriteUpdate> writeUpdateStats = stats.writeUpdateStats;
+
+// Summera ihop tiden som varje frame Frame har tagit
+double sum = 0;
+for (WriteUpdate& update : writeUpdateStats)
+  sum += update.timeSpent;
+
+fprintf(stderr, "\n+--------------------------------------+------------+\n");
+fprintf(stderr, "| %-36s | %10.3f |\n", "Total time spent writing frames (s)", sum);
+fprintf(stderr, "+--------------------------------------+------------+\n");
+
+
+
+
+
 
 int criticalFrame = findCriticalFrame(server);
 if (criticalFrame != -1) {
-    const ManagerStats& stats = server->stats();
     const WriteUpdate& update = stats.writeUpdateStats[criticalFrame - 1];
 
     // Print header
