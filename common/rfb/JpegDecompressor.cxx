@@ -184,19 +184,28 @@ void JpegDecompressor::decompress(const uint8_t *jpegBuf,
 #ifdef JCS_EXTENSIONS
   // Try to have libjpeg output directly to our native format
   // libjpeg can only handle some "standard" formats
-  if (pfRGBX == pf)
-    dinfo->out_color_space = JCS_EXT_RGBX;
-  else if (pfBGRX == pf)
-    dinfo->out_color_space = JCS_EXT_BGRX;
-  else if (pfXRGB == pf)
-    dinfo->out_color_space = JCS_EXT_XRGB;
-  else if (pfXBGR == pf)
-    dinfo->out_color_space = JCS_EXT_XBGR;
+if (pfRGBX == pf) {
+  dinfo->out_color_space = JCS_EXT_RGBX;
+  fprintf(stderr, "[JD] using color space: JCS_EXT_RGBX\n");
+}
+else if (pfBGRX == pf) {
+  dinfo->out_color_space = JCS_EXT_BGRX;
+  fprintf(stderr, "[JD] using color space: JCS_EXT_BGRX\n");
+}
+else if (pfXRGB == pf) {
+  dinfo->out_color_space = JCS_EXT_XRGB;
+  fprintf(stderr, "[JD] using color space: JCS_EXT_XRGB\n");
+}
+else if (pfXBGR == pf) {
+  dinfo->out_color_space = JCS_EXT_XBGR;
+  fprintf(stderr, "[JD] using color space: JCS_EXT_XBGR\n");
+}
 
-  if (dinfo->out_color_space != JCS_RGB) {
-    dstBuf = (uint8_t *)buf;
-    pixelsize = 4;
-  }
+if (dinfo->out_color_space != JCS_RGB) {
+  dstBuf = (uint8_t *)buf;
+  pixelsize = 4;
+  fprintf(stderr, "[JD] direct output to buf with 4 bytes/pixel\n");
+}
 #endif
 
   if (dinfo->out_color_space == JCS_RGB) {

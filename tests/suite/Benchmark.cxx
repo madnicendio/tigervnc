@@ -176,7 +176,7 @@ for (size_t i = 0; i < encoders.size(); ++i) {
                 compressionRatio);
 
         totalMPixelsPerSecond += mpixelsPerSecond;
-        totalCompressionRatio += compressionRatio;
+        totalCompressionRatio += compressionRatio * percentage/100;
     }
 }
 
@@ -188,7 +188,7 @@ fprintf(stderr, "| %-10s | %-10.2Lf | %-10llu | %-10d | %-10llu | %-10.2f | %-10
         totalNumberOfRects,
         totalMedianRectSize / encoders.size(),  // Medelvärde
         totalMPixelsPerSecond / encoders.size(),  // Medelvärde
-        totalCompressionRatio / encoders.size()); // Medelvärde
+        totalCompressionRatio); // Viktat efter pixlarna
 fprintf(stderr, "+------------+------------+------------+------------+------------+------------+------------+\n\n");
 
 // Ta fram hur lång tid en total frame update tar

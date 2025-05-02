@@ -28,6 +28,7 @@
 #include <rdr/MemOutStream.h>
 #include <rfb/PixelFormat.h>
 #include <rfb/Rect.h>
+#include <vector>
 
 struct jpeg_compress_struct;
 
@@ -46,6 +47,8 @@ namespace rfb {
     void compress(const uint8_t *, int, const Rect&, const PixelFormat&, int, int);
 
     void writeBytes(const uint8_t*, int);
+
+    uint8_t* decompressToRGBX(int width, int height, const rfb::PixelFormat& pf);
 
   private:
 

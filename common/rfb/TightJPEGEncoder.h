@@ -46,6 +46,9 @@ namespace rfb {
 
   protected:
     void writeCompact(uint32_t value, rdr::OutStream* os);
+    double calculateMSE(const uint8_t* original, const uint8_t* decompressed, int width, int height, int stride);
+    void dumpPixels(const uint8_t* data, int width, int height, int stride, int bpp, const char* label);
+
 
   protected:
     JpegCompressor jc;

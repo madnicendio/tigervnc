@@ -146,6 +146,31 @@ void TightJPEGEncoder::writeRect(const PixelBuffer* pb,
   jc.compress(buffer, stride, pb->getRect(),
               pb->getPF(), quality, subsampling);
 
+
+  // Quality assessment :-)
+
+  // JPEG decompression
+  uint8_t* decompressed = jc.decompressToRGBX(pb->getRect().width(),
+                                           pb->getRect().height(),
+                                           pb->getPF());
+  const int width = pb->getRect().width();
+  const int height = pb->getRect().height();
+  const int strideBytes = width * 4;  // kanske width * 4
+  int strideOrig = width*4;
+  int strideDecomp = width*4;
+  if (width != stride) {
+    fprintf(stderr, "Width: %d, stride: %d", width, stride);
+  }
+
+  dumpPixels(buffer, width, height, strideOrig, 4, "ORIGINAL");
+  dumpPixels(decompressed, width, height, strideDecomp, 4, "DECOMPRESSED");
+  double mse = calculateMSE(buffer, decompressed, width, height, stride);
+  fprintf(stderr, "Average MSE: %f\n", mse);
+
+
+  //delete[] decompressed;
+
+  // Den komprimerade bilddatan skickas vidare!
   os = conn->getOutStream();
 
   os->writeU8(tightJpeg << 4);
@@ -182,3 +207,84 @@ void TightJPEGEncoder::writeCompact(uint32_t value, rdr::OutStream* os)
     }
   }
 }
+
+double TightJPEGEncoder::calculateMSE(const uint8_t* original, const uint8_t* decompressed, int width, int height, int stride)
+{
+    fprintf(stderr, "calculateMSE: width=%d, height=%d, stride=%d\n", width, height, stride);
+
+    double mse_r = 0.0;
+    double mse_g = 0.0;
+    double mse_b = 0.0;
+
+    int colourComp = 0;
+
+    // färgkanaler per pixel (RGBX)
+    int origCh = 4;
+    int decomCh = 4;
+
+    int strideOrig = width * origCh;
+    int strideDecomp = width * decomCh;
+
+    if (!original || !decompressed) {
+        fprintf(stderr, "Nullptr\n");
+        return -1; // Returnera fel om bilderna är null
+    }
+
+    for (int y = 0; y < height; ++y) {
+        const uint8_t* rowOrig = original + y * strideOrig;
+        const uint8_t* rowDecomp = decompressed + y * strideDecomp;
+
+        for (int x = 0; x < width; ++x) {
+            // Original: [R, G, B, X]
+            uint8_t r_orig = rowOrig[x * origCh + 0];
+            uint8_t g_orig = rowOrig[x * origCh + 1];
+            uint8_t b_orig = rowOrig[x * origCh + 2];
+
+            // Dekomprimerad: [R, G, B, X]
+            uint8_t r_comp = rowDecomp[x * decomCh + 0];
+            uint8_t g_comp = rowDecomp[x * decomCh + 1];
+            uint8_t b_comp = rowDecomp[x * decomCh + 2];
+
+            int dr = static_cast<int>(r_orig) - static_cast<int>(r_comp);
+            int dg = static_cast<int>(g_orig) - static_cast<int>(g_comp);
+            int db = static_cast<int>(b_orig) - static_cast<int>(b_comp);
+
+            mse_r += dr * dr;
+            mse_g += dg * dg;
+            mse_b += db * db;
+
+            colourComp += 1;
+        }
+    }
+    if (colourComp == 0) {
+        return 0.0;
+    }
+
+  mse_r /= (width*height);
+  mse_g /= (width*height);
+  mse_b /= (width*height);
+
+  fprintf(stderr, "MSE R: %f\n", mse_r);
+  fprintf(stderr, "MSE G: %f\n", mse_g);
+  fprintf(stderr, "MSE B: %f\n", mse_b);
+
+
+
+    return (mse_r + mse_g + mse_b) / 3.0;
+}
+
+
+void TightJPEGEncoder::dumpPixels(const uint8_t* data, int width, int height, int stride, int bpp, const char* label)
+{
+    fprintf(stderr, "\n--- %s ---\n", label);
+    for (int y = 0; y < height; ++y) { // Begränsa till max 5 rader
+        fprintf(stderr, "Row %d: ", y);
+        const uint8_t* row = data + y * stride;
+        for (int x = 0; x < width && x < 10; ++x) { // Max 10 pixlar per rad
+            const uint8_t* px = row + x * bpp;
+            fprintf(stderr, "[%3d %3d %3d] ", px[0], px[1], px[2]); // Visa bara R G B
+        }
+        fprintf(stderr, "\n");
+    }
+}
+

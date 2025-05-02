@@ -28,6 +28,7 @@
 #include <rfb/Rect.h>
 #include <rfb/PixelFormat.h>
 #include <rfb/ClientParams.h>
+#include <rfb/JpegDecompressor.h>
 
 #include <stdio.h>
 extern "C" {
@@ -159,13 +160,22 @@ JpegCompressor::~JpegCompressor(void)
 void JpegCompressor::compress(const uint8_t *buf, volatile int stride,
                               const Rect& r, const PixelFormat& pf,
                               int quality, int subsamp)
+/* Komprimera Rect r med en viss PixelFormat pf till JPEG, med angiven kvalitet och subsampling. Den färdiga JPEG-datan hamnar i jpegBuf, via libjpeg:s interna mekanism (inte synlig här)?.
+- Variabler:
+  buf: pekare till bilddata som ska komprimeras
+  stride: antal pixlar per rad
+  r: rektangel som anger vilken del av bilden som ska komprimeras.
+  pf: färgformat?
+  quality: JPEG-kvalitet
+  subsamp: subsamplingsmetd
+*/
 {
   int w = r.width();
   int h = r.height();
-  int pixelsize;
-  uint8_t * volatile srcBuf = nullptr;
+  int pixelsize;  // default är RGB med 3 byte/pixel (antal färgkomponenter)
+  uint8_t * volatile srcBuf = nullptr;  // pekare till input-buffer som ska skickas till libjpeg
   volatile bool srcBufIsTemp = false;
-  JSAMPROW * volatile rowPointer = nullptr;
+  JSAMPROW * volatile rowPointer = nullptr;   // lista med pekare till varje rad i bilden
 
   if(setjmp(err->jmpBuffer)) {
     // this will execute if libjpeg has an error
@@ -180,6 +190,7 @@ void JpegCompressor::compress(const uint8_t *buf, volatile int stride,
   cinfo->in_color_space = JCS_RGB;
   pixelsize = 3;
 
+// Hantera utökade färgformat: då blir pixelsize 4 och srcBuf = buf
 #ifdef JCS_EXTENSIONS
   // Try to have libjpeg output directly to our native format
   // libjpeg can only handle some "standard" formats
@@ -204,11 +215,10 @@ void JpegCompressor::compress(const uint8_t *buf, volatile int stride,
   if (cinfo->in_color_space == JCS_RGB) {
     srcBuf = new uint8_t[w * h * pixelsize];
     srcBufIsTemp = true;
-    pf.rgbFromBuffer(srcBuf, (const uint8_t *)buf, w, stride, h);
+    pf.rgbFromBuffer(srcBuf, (const uint8_t *)buf, w, stride, h); // förbered datat till exakt RGB
     stride = w;
   }
-
-  cinfo->input_components = pixelsize;
+  cinfo->input_components = pixelsize;  // låt libjpeg veta hur många färgkomponenter varje pixel har
 
   jpeg_set_defaults(cinfo);
 
@@ -219,7 +229,9 @@ void JpegCompressor::compress(const uint8_t *buf, volatile int stride,
     else
       cinfo->dct_method = JDCT_FASTEST;
   }
+  // Justera hur mycket färgkomponenter ska samplas ner (ex 4x, 2x, gray)
 
+// Subsampling! Default är ingen subsampling
   switch (subsamp) {
   case subsample16X:
   case subsample8X:
@@ -239,11 +251,12 @@ void JpegCompressor::compress(const uint8_t *buf, volatile int stride,
     cinfo->comp_info[0].h_samp_factor = 1;
     cinfo->comp_info[0].v_samp_factor = 1;
   }
-
+  // Libjpeg behöver en array av rader
   rowPointer = new JSAMPROW[h];
   for (int dy = 0; dy < h; dy++)
     rowPointer[dy] = (JSAMPROW)(&srcBuf[dy * stride * pixelsize]);
 
+  // Starta komprimeringen, mata in rad för rad
   jpeg_start_compress(cinfo, TRUE);
   while (cinfo->next_scanline < cinfo->image_height)
     jpeg_write_scanlines(cinfo, &rowPointer[cinfo->next_scanline],
@@ -258,4 +271,25 @@ void JpegCompressor::compress(const uint8_t *buf, volatile int stride,
 void JpegCompressor::writeBytes(const uint8_t* /*data*/, int /*length*/)
 {
   throw std::logic_error("writeBytes() is not valid with a JpegCompressor instance.  Use compress() instead.");
+}
+
+uint8_t* JpegCompressor::decompressToRGBX(int width, int height, const rfb::PixelFormat& pf)
+{
+  JpegDecompressor jd;
+  int pixelsize = 4; // pf.bpp / 8; // 32
+  // fprintf(stderr, "bpp: %d\n", pf.bpp);
+  if (pixelsize == 0) pixelsize = 4; // fallback om bitsPerPixel inte är korrekt satt
+
+  int size = width * height * pixelsize;
+  uint8_t* result = new uint8_t[size];
+
+  rfb::Rect rect;
+  rect.tl.x = 0;
+  rect.tl.y = 0;
+  rect.br.x = width;
+  rect.br.y = height;
+
+  jd.decompress(this->data(), this->length(), result, width, rect, pf);
+
+  return result;
 }
