@@ -41,7 +41,7 @@ BOOL CALLBACK enumWindows(HWND hwnd, LPARAM lParam) {
   char className[16];
   if (GetClassName(hwnd, className, sizeof(className)) &&
       (strcmp(className, shellIconClass) == 0)) {
-    vlog.debug("located tray icon window (%s)", className);
+    vlog.debug("Located tray icon window (%s)", className);
     DWORD processId = 0;
     GetWindowThreadProcessId(hwnd, &processId);
     if (!processId)
@@ -51,7 +51,7 @@ BOOL CALLBACK enumWindows(HWND hwnd, LPARAM lParam) {
       return TRUE;
     if (!OpenProcessToken(process, MAXIMUM_ALLOWED, (HANDLE*)lParam))
       return TRUE;
-    vlog.debug("obtained user token");
+    vlog.debug("Obtained user token");
     return FALSE;
   }
   return TRUE;
@@ -59,14 +59,14 @@ BOOL CALLBACK enumWindows(HWND hwnd, LPARAM lParam) {
 
 BOOL CALLBACK enumDesktops(LPTSTR lpszDesktop, LPARAM lParam) {
   HDESK desktop = OpenDesktop(lpszDesktop, 0, FALSE, DESKTOP_ENUMERATE);
-  vlog.debug("opening \"%s\"", lpszDesktop);
+  vlog.debug("Opening \"%s\"", lpszDesktop);
   if (!desktop) {
-    vlog.info("desktop \"%s\" inaccessible", lpszDesktop);
+    vlog.info("Desktop \"%s\" inaccessible", lpszDesktop);
     return TRUE;
   }
   BOOL result = EnumDesktopWindows(desktop, enumWindows, lParam);
   if (!CloseDesktop(desktop))
-    vlog.info("unable to close desktop: %ld", GetLastError());
+    vlog.info("Unable to close desktop: %ld", GetLastError());
   return result;
 }
 
@@ -80,7 +80,7 @@ CurrentUserToken::CurrentUserToken() {
     if (!OpenProcessToken(GetCurrentProcess(), GENERIC_ALL, &h)) {
       DWORD err = GetLastError();
       if (err != ERROR_CALL_NOT_IMPLEMENTED)
-        throw rdr::SystemException("OpenProcessToken failed", err);
+        throw rdr::win32_error("OpenProcessToken failed", err);
       h = INVALID_HANDLE_VALUE;
     }
   }
@@ -92,11 +92,11 @@ ImpersonateCurrentUser::ImpersonateCurrentUser() {
   if (!isServiceProcess())
     return;
   if (!token.canImpersonate())
-    throw rdr::Exception("Cannot impersonate unsafe or null token");
+    throw std::runtime_error("Cannot impersonate unsafe or null token");
   if (!ImpersonateLoggedOnUser(token)) {
     DWORD err = GetLastError();
     if (err != ERROR_CALL_NOT_IMPLEMENTED)
-      throw rdr::SystemException("Failed to impersonate user", GetLastError());
+      throw rdr::win32_error("Failed to impersonate user", GetLastError());
   }
 }
 
@@ -114,7 +114,7 @@ UserName::UserName() {
   char buf[UNLEN+1];
   DWORD len = UNLEN+1;
   if (!GetUserName(buf, &len))
-    throw rdr::SystemException("GetUserName failed", GetLastError());
+    throw rdr::win32_error("GetUserName failed", GetLastError());
   assign(buf);
 }
 

@@ -16,7 +16,7 @@
  * USA.
  */
 
-// -=- VNC Server 4.0 for Windows (WinVNC4)
+// -=- VNC server 4.0 for Windows (WinVNC4)
 
 #ifdef HAVE_CONFIG_H
 #include <config.h>
@@ -88,7 +88,7 @@ static void programUsage() {
 
 static void MsgBoxOrLog(const char* msg, bool isError=false) {
   if (close_console) {
-    MsgBox(0, msg, (isError ? MB_ICONERROR : MB_ICONINFORMATION) | MB_OK);
+    MsgBox(nullptr, msg, (isError ? MB_ICONERROR : MB_ICONINFORMATION) | MB_OK);
   } else {
     if (isError) {
       try {
@@ -116,10 +116,10 @@ static void processParams(int argc, char** argv) {
           if (ancd.showDialog())
             host = ancd.getHostName();
         }
-        if (host != NULL) {
-          HWND hwnd = FindWindow(0, "winvnc::IPC_Interface");
+        if (host != nullptr) {
+          HWND hwnd = FindWindow(nullptr, "winvnc::IPC_Interface");
           if (!hwnd)
-            throw rdr::Exception("Unable to locate existing VNC Server.");
+            throw std::runtime_error("Unable to locate existing VNC Server.");
           COPYDATASTRUCT copyData;
           copyData.dwData = 1; // *** AddNewClient
           copyData.cbData = strlen(host);
@@ -130,12 +130,12 @@ static void processParams(int argc, char** argv) {
         }
       } else if (strcasecmp(argv[i], "-disconnect") == 0) {
         runServer = false;
-        HWND hwnd = FindWindow(0, "winvnc::IPC_Interface");
+        HWND hwnd = FindWindow(nullptr, "winvnc::IPC_Interface");
         if (!hwnd)
-          throw rdr::Exception("Unable to locate existing VNC Server.");
+          throw std::runtime_error("Unable to locate existing VNC Server.");
         COPYDATASTRUCT copyData;
         copyData.dwData = 2; // *** DisconnectClients
-        copyData.lpData = 0;
+        copyData.lpData = nullptr;
         copyData.cbData = 0;
         printf("Sending disconnect request to VNC Server...\n");
         if (!SendMessage(hwnd, WM_COPYDATA, 0, (LPARAM)&copyData))
@@ -155,7 +155,7 @@ static void processParams(int argc, char** argv) {
         runServer = false;
         std::string result;
         DWORD state = rfb::win32::getServiceState(VNCServerService::Name);
-        result = format("The %s Service is in the %s state.",
+        result = format("The %s service is in the %s state.",
                         VNCServerService::Name,
                         rfb::win32::serviceStateName(state));
         MsgBoxOrLog(result.c_str());
@@ -177,13 +177,13 @@ static void processParams(int argc, char** argv) {
         // Try to clean up earlier services we've had
         try {
           rfb::win32::unregisterService("WinVNC4");
-        } catch (rdr::SystemException&) {
+        } catch (rdr::win32_error&) {
           // Do nothing as we might fail simply because there was no
           // service to remove
         }
         try {
           rfb::win32::unregisterService("TigerVNC Server");
-        } catch (rdr::SystemException&) {
+        } catch (rdr::win32_error&) {
         }
 
         if (rfb::win32::registerService(VNCServerService::Name,
@@ -199,9 +199,9 @@ static void processParams(int argc, char** argv) {
 
       } else if (strcasecmp(argv[i], "-noconsole") == 0) {
         close_console = true;
-        vlog.info("closing console");
+        vlog.info("Closing console");
         if (!FreeConsole())
-          vlog.info("unable to close console:%lu", GetLastError());
+          vlog.info("Unable to close console:%lu", GetLastError());
 
       } else if ((strcasecmp(argv[i], "-help") == 0) ||
         (strcasecmp(argv[i], "--help") == 0) ||
@@ -212,24 +212,22 @@ static void processParams(int argc, char** argv) {
         break;
 
       } else {
-        // Try to process <option>=<value>, or -<bool>
-        if (Configuration::setParam(argv[i], true))
+        int ret;
+
+        ret = Configuration::handleParamArg(argc, argv, i);
+        if (ret > 0) {
+          i += ret - 1;
           continue;
-        // Try to process -<option> <value>
-        if ((argv[i][0] == '-') && (i+1 < argc)) {
-          if (Configuration::setParam(&argv[i][1], argv[i+1], true)) {
-            i++;
-            continue;
-          }
         }
+
         // Nope.  Show them usage and don't run the server
         runServer = false;
         programUsage();
         break;
       }
 
-    } catch (rdr::Exception& e) {
-      MsgBoxOrLog(e.str(), true);
+    } catch (std::exception& e) {
+      MsgBoxOrLog(e.what(), true);
     }
   }
 }
@@ -250,7 +248,7 @@ int WINAPI WinMain(HINSTANCE /*inst*/, HINSTANCE /*prevInst*/, char* /*cmdLine*/
 	freopen("CONIN$", "rb", stdin);
 	freopen("CONOUT$", "wb", stdout);
 	freopen("CONOUT$", "wb", stderr);
-    setbuf(stderr, 0);
+    setbuf(stderr, nullptr);
 	initStdIOLoggers();
 	initFileLogger("C:\\temp\\WinVNC4.log");
 	logParams.setParam("*:stderr:100");
@@ -259,8 +257,6 @@ int WINAPI WinMain(HINSTANCE /*inst*/, HINSTANCE /*prevInst*/, char* /*cmdLine*/
 	logParams.setParam("*:stderr:0");
 #endif
     rfb::win32::initEventLogLogger(VNCServerService::Name);
-
-	Configuration::enableServerParams();
 
     // - By default, just log errors to stderr
     
@@ -284,8 +280,8 @@ int WINAPI WinMain(HINSTANCE /*inst*/, HINSTANCE /*prevInst*/, char* /*cmdLine*/
     }
 
     vlog.debug("WinVNC service destroyed");
-  } catch (rdr::Exception& e) {
-    MsgBoxOrLog(e.str(), true);
+  } catch (std::exception& e) {
+    MsgBoxOrLog(e.what(), true);
   }
 
   vlog.debug("WinVNC process quitting");

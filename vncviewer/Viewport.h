@@ -1,5 +1,5 @@
 /* Copyright (C) 2002-2005 RealVNC Ltd.  All Rights Reserved.
- * Copyright 2011-2019 Pierre Ossman <ossman@cendio.se> for Cendio AB
+ * Copyright 2011-2021 Pierre Ossman <ossman@cendio.se> for Cendio AB
  * 
  * This is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -20,22 +20,23 @@
 #ifndef __VIEWPORT_H__
 #define __VIEWPORT_H__
 
-#include <map>
-
 #include <rfb/Rect.h>
 
 #include <FL/Fl_Widget.H>
 
 #include "EmulateMB.h"
+#include "Keyboard.h"
 
 class Fl_Menu_Button;
 class Fl_RGB_Image;
 
 class CConn;
+class Keyboard;
 class PlatformPixelBuffer;
 class Surface;
 
-class Viewport : public Fl_Widget, public EmulateMB {
+class Viewport : public Fl_Widget, protected EmulateMB,
+                 protected KeyboardHandler {
 public:
 
   Viewport(int w, int h, const rfb::PixelFormat& serverPF, CConn* cc_);
@@ -63,38 +64,35 @@ public:
 
   // Fl_Widget callback methods
 
-  void draw();
+  void draw() override;
 
-  void resize(int x, int y, int w, int h);
+  void resize(int x, int y, int w, int h) override;
 
-  int handle(int event);
+  int handle(int event) override;
 
 protected:
-  virtual void sendPointerEvent(const rfb::Point& pos, int buttonMask);
+  void sendPointerEvent(const rfb::Point& pos, uint16_t buttonMask) override;
 
 private:
   bool hasFocus();
 
-  unsigned int getModifierMask(unsigned int keysym);
+  // Show the currently set (or system) cursor
+  void showCursor();
 
   static void handleClipboardChange(int source, void *data);
 
   void flushPendingClipboard();
 
-  void handlePointerEvent(const rfb::Point& pos, int buttonMask);
+  void handlePointerEvent(const rfb::Point& pos, uint16_t buttonMask);
   static void handlePointerTimeout(void *data);
 
   void resetKeyboard();
 
-  void handleKeyPress(int keyCode, uint32_t keySym);
-  void handleKeyRelease(int keyCode);
+  void handleKeyPress(int systemKeyCode,
+                      uint32_t keyCode, uint32_t keySym) override;
+  void handleKeyRelease(int systemKeyCode) override;
 
   static int handleSystemEvent(void *event, void *data);
-
-#ifdef WIN32
-  static void handleAltGrTimeout(void *data);
-  void resolveAltGrDetection(bool isAltGrSequence);
-#endif
 
   void pushLEDState();
 
@@ -111,19 +109,12 @@ private:
   PlatformPixelBuffer* frameBuffer;
 
   rfb::Point lastPointerPos;
-  int lastButtonMask;
+  uint16_t lastButtonMask;
 
-  typedef std::map<int, uint32_t> DownMap;
-  DownMap downKeySym;
-
-#ifdef WIN32
-  bool altGrArmed;
-  unsigned int altGrCtrlTime;
-#endif
+  Keyboard* keyboard;
 
   bool firstLEDState;
 
-  bool pendingServerClipboard;
   bool pendingClientClipboard;
 
   int clipboardSource;
@@ -137,6 +128,7 @@ private:
 
   Fl_RGB_Image *cursor;
   rfb::Point cursorHotspot;
+  bool cursorIsBlank;
 };
 
 #endif

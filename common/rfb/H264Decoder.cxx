@@ -18,6 +18,10 @@
  * USA.
  */
 
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
+
 #define MAX_H264_INSTANCES 64
 
 #include <deque>
@@ -25,14 +29,10 @@
 #include <rdr/MemInStream.h>
 #include <rdr/InStream.h>
 #include <rdr/OutStream.h>
-#include <rfb/LogWriter.h>
-#include <rfb/Exception.h>
 #include <rfb/H264Decoder.h>
 #include <rfb/H264DecoderContext.h>
 
 using namespace rfb;
-
-static LogWriter vlog("H264Decoder");
 
 enum rectFlags {
   resetContext       = 0x1,
@@ -50,19 +50,17 @@ H264Decoder::~H264Decoder()
 
 void H264Decoder::resetContexts()
 {
-  os::AutoMutex lock(&mutex);
-  for (std::deque<H264DecoderContext*>::iterator it = contexts.begin(); it != contexts.end(); it++)
-    delete *it;
+  for (H264DecoderContext* context : contexts)
+    delete context;
   contexts.clear();
 }
 
 H264DecoderContext* H264Decoder::findContext(const Rect& r)
 {
-  os::AutoMutex m(&mutex);
-  for (std::deque<H264DecoderContext*>::iterator it = contexts.begin(); it != contexts.end(); it++)
-    if ((*it)->isEqualRect(r))
-      return *it;
-  return NULL;
+  for (H264DecoderContext* context : contexts)
+    if (context->isEqualRect(r))
+      return context;
+  return nullptr;
 }
 
 bool H264Decoder::readRect(const Rect& /*r*/,
@@ -79,9 +77,9 @@ bool H264Decoder::readRect(const Rect& /*r*/,
 
   len = is->readU32();
   os->writeU32(len);
-  uint32_t flags = is->readU32();
+  uint32_t reset = is->readU32();
 
-  os->writeU32(flags);
+  os->writeU32(reset);
 
   if (!is->hasDataOrRestore(len))
     return false;
@@ -100,22 +98,27 @@ void H264Decoder::decodeRect(const Rect& r, const uint8_t* buffer,
 {
   rdr::MemInStream is(buffer, buflen);
   uint32_t len = is.readU32();
-  uint32_t flags = is.readU32();
+  uint32_t reset = is.readU32();
 
-  H264DecoderContext* ctx = NULL;
-  if (flags & resetAllContexts)
+  H264DecoderContext* ctx = nullptr;
+  if (reset & resetAllContexts)
   {
     resetContexts();
     if (!len)
       return;
-    flags &= ~(resetContext | resetAllContexts);
+    reset &= ~(resetContext | resetAllContexts);
   } else {
     ctx = findContext(r);
   }
 
+  if (ctx && (reset & resetContext)) {
+    contexts.remove(ctx);
+    delete ctx;
+    ctx = nullptr;
+  }
+
   if (!ctx)
   {
-    os::AutoMutex lock(&mutex);
     if (contexts.size() >= MAX_H264_INSTANCES)
     {
       H264DecoderContext* excess_ctx = contexts.front();
@@ -124,15 +127,9 @@ void H264Decoder::decodeRect(const Rect& r, const uint8_t* buffer,
     }
     ctx = H264DecoderContext::createContext(r);
     if (!ctx)
-      throw Exception("H264Decoder: Context not be created");
+      throw std::runtime_error("H264Decoder: Context not be created");
     contexts.push_back(ctx);
   }
-
-  if (!ctx->isReady())
-    throw Exception("H264Decoder: Context is not ready");
-
-  if (flags & resetContext)
-    ctx->reset();
 
   if (!len)
     return;

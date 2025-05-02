@@ -18,9 +18,9 @@
  * USA.
  */
 
-#include <os/Mutex.h>
-#include <rfb/Exception.h>
-#include <rfb/LogWriter.h>
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
 
 #include <rfb/H264DecoderContext.h>
 
@@ -34,31 +34,11 @@
 
 using namespace rfb;
 
-static LogWriter vlog("H264DecoderContext");
-
 H264DecoderContext *H264DecoderContext::createContext(const Rect &r)
 {
-  H264DecoderContext *ret = new H264DecoderContextType(r);
-  if (!ret->initCodec())
-  {
-    throw Exception("H264DecoderContext: Unable to create context");
-  }
-
-  return ret;
+  return new H264DecoderContextType(r);
 }
 
 H264DecoderContext::~H264DecoderContext()
 {
-}
-
-bool H264DecoderContext::isReady()
-{
-  os::AutoMutex lock(&mutex);
-  return initialized;
-}
-
-void H264DecoderContext::reset()
-{
-  freeCodec();
-  initCodec();
 }

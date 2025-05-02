@@ -22,13 +22,13 @@
 
 #include <assert.h>
 
+#include <stdexcept>
+
 #include <ApplicationServices/ApplicationServices.h>
 
 #include <FL/Fl_RGB_Image.H>
 #include <FL/Fl_Window.H>
 #include <FL/x.H>
-
-#include <rdr/Exception.h>
 
 #include "cocoa.h"
 #include "Surface.h"
@@ -44,10 +44,10 @@ static CGImageRef create_image(CGColorSpaceRef lut,
 
   CGImageRef image;
 
-  provider = CGDataProviderCreateWithData(NULL, data,
-                                          w * h * 4, NULL);
+  provider = CGDataProviderCreateWithData(nullptr, data,
+                                          w * h * 4, nullptr);
   if (!provider)
-    throw rdr::Exception("CGDataProviderCreateWithData");
+    throw std::runtime_error("CGDataProviderCreateWithData");
 
   // FIXME: This causes a performance hit, but is necessary to avoid
   //        artifacts in the edges of the window
@@ -58,10 +58,11 @@ static CGImageRef create_image(CGColorSpaceRef lut,
 
   image = CGImageCreate(w, h, 8, 32, w * 4, lut,
                         alpha | kCGBitmapByteOrder32Little,
-                        provider, NULL, false, kCGRenderingIntentDefault);
+                        provider, nullptr, false,
+                        kCGRenderingIntentDefault);
   CGDataProviderRelease(provider);
   if (!image)
-    throw rdr::Exception("CGImageCreate");
+    throw std::runtime_error("CGImageCreate");
 
   return image;
 }
@@ -84,7 +85,7 @@ static void render(CGContextRef gc, CGColorSpaceRef lut,
 
   subimage = CGImageCreateWithImageInRect(image, rect);
   if (!subimage)
-    throw rdr::Exception("CGImageCreateImageWithImageInRect");
+    throw std::runtime_error("CGImageCreateImageWithImageInRect");
 
   CGContextSaveGState(gc);
 
@@ -111,7 +112,7 @@ static CGContextRef make_bitmap(int width, int height, unsigned char* data)
   bitmap = CGBitmapContextCreate(data, width, height, 8, width*4, srgb,
                                  kCGImageAlphaPremultipliedFirst | kCGBitmapByteOrder32Little);
   if (!bitmap)
-    throw rdr::Exception("CGBitmapContextCreate");
+    throw std::runtime_error("CGBitmapContextCreate");
 
   return bitmap;
 }
@@ -136,7 +137,8 @@ void Surface::clear(unsigned char r, unsigned char g, unsigned char b, unsigned 
   }
 }
 
-void Surface::draw(int src_x, int src_y, int x, int y, int w, int h)
+void Surface::draw(int src_x, int src_y, int dst_x, int dst_y,
+                   int dst_w, int dst_h)
 {
   CGColorSpaceRef lut;
 
@@ -147,32 +149,34 @@ void Surface::draw(int src_x, int src_y, int x, int y, int w, int h)
   CGContextConcatCTM(fl_gc, CGAffineTransformInvert(CGContextGetCTM(fl_gc)));
 
   // macOS Coordinates are from bottom left, not top left
-  y = Fl_Window::current()->h() - (y + h);
+  dst_y = Fl_Window::current()->h() - (dst_y + dst_h);
 
   lut = cocoa_win_color_space(Fl_Window::current());
   render(fl_gc, lut, data, kCGBlendModeCopy, 1.0,
-         src_x, src_y, width(), height(), x, y, w, h);
+         src_x, src_y, width(), height(), dst_x, dst_y, dst_w, dst_h);
   CGColorSpaceRelease(lut);
 
   CGContextRestoreGState(fl_gc);
 }
 
-void Surface::draw(Surface* dst, int src_x, int src_y, int x, int y, int w, int h)
+void Surface::draw(Surface* dst, int src_x, int src_y,
+                   int dst_x, int dst_y, int dst_w, int dst_h)
 {
   CGContextRef bitmap;
 
   bitmap = make_bitmap(dst->width(), dst->height(), dst->data);
 
   // macOS Coordinates are from bottom left, not top left
-  y = dst->height() - (y + h);
+  dst_y = dst->height() - (dst_y + dst_h);
 
   render(bitmap, srgb, data, kCGBlendModeCopy, 1.0,
-         src_x, src_y, width(), height(), x, y, w, h);
+         src_x, src_y, width(), height(), dst_x, dst_y, dst_w, dst_h);
 
   CGContextRelease(bitmap);
 }
 
-void Surface::blend(int src_x, int src_y, int x, int y, int w, int h, int a)
+void Surface::blend(int src_x, int src_y, int dst_x, int dst_y,
+                    int dst_w, int dst_h, int a)
 {
   CGColorSpaceRef lut;
 
@@ -183,27 +187,28 @@ void Surface::blend(int src_x, int src_y, int x, int y, int w, int h, int a)
   CGContextConcatCTM(fl_gc, CGAffineTransformInvert(CGContextGetCTM(fl_gc)));
 
   // macOS Coordinates are from bottom left, not top left
-  y = Fl_Window::current()->h() - (y + h);
+  dst_y = Fl_Window::current()->h() - (dst_y + dst_h);
 
   lut = cocoa_win_color_space(Fl_Window::current());
   render(fl_gc, lut, data, kCGBlendModeNormal, (CGFloat)a/255.0,
-         src_x, src_y, width(), height(), x, y, w, h);
+         src_x, src_y, width(), height(), dst_x, dst_y, dst_w, dst_h);
   CGColorSpaceRelease(lut);
 
   CGContextRestoreGState(fl_gc);
 }
 
-void Surface::blend(Surface* dst, int src_x, int src_y, int x, int y, int w, int h, int a)
+void Surface::blend(Surface* dst, int src_x, int src_y,
+                    int dst_x, int dst_y, int dst_w, int dst_h, int a)
 {
   CGContextRef bitmap;
 
   bitmap = make_bitmap(dst->width(), dst->height(), dst->data);
 
   // macOS Coordinates are from bottom left, not top left
-  y = dst->height() - (y + h);
+  dst_y = dst->height() - (dst_y + dst_h);
 
   render(bitmap, srgb, data, kCGBlendModeNormal, (CGFloat)a/255.0,
-         src_x, src_y, width(), height(), x, y, w, h);
+         src_x, src_y, width(), height(), dst_x, dst_y, dst_w, dst_h);
 
   CGContextRelease(bitmap);
 }

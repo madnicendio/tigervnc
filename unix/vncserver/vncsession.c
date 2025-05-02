@@ -259,6 +259,19 @@ stop_pam(pam_handle_t * pamh, int pamret)
     return pamret;
 }
 
+static char *
+getenvp(const char *name, char **envp)
+{
+    while (*envp) {
+        size_t varlen;
+        varlen = strcspn(*envp, "=");
+        if (strncmp(*envp, name, varlen) == 0)
+            return *envp + varlen + 1;
+        envp++;
+    }
+    return NULL;
+}
+
 static char **
 prepare_environ(pam_handle_t * pamh)
 {
@@ -345,13 +358,44 @@ switch_user(const char *username, uid_t uid, gid_t gid)
     }
 }
 
+static int
+mkdir_p(const char *path_, mode_t mode)
+{
+  char *path = strdup(path_);
+  char *p;
+
+  for (p = path + 1; *p; p++) {
+    if (*p == '/') {
+      *p = '\0';
+      if (mkdir(path, mode) == -1) {
+        if (errno != EEXIST) {
+          free(path);
+          return -1;
+        }
+      }
+      *p = '/';
+    }
+  }
+
+  if (mkdir(path, mode) == -1) {
+    free(path);
+    return -1;
+  }
+
+  free(path);
+
+  return 0;
+}
+
 static void
-redir_stdio(const char *homedir, const char *display)
+redir_stdio(const char *homedir, const char *display, char **envp)
 {
     int fd;
     long hostlen;
-    char* hostname = NULL;
-    char logfile[PATH_MAX];
+    char* hostname = NULL, *xdgstate;
+    char logdir[PATH_MAX], logfile[PATH_MAX], logfile_old[PATH_MAX], legacy[PATH_MAX];
+    struct stat st;
+    size_t fmt_len;
 
     fd = open("/dev/null", O_RDONLY);
     if (fd == -1) {
@@ -364,23 +408,44 @@ redir_stdio(const char *homedir, const char *display)
     }
     close(fd);
 
-    snprintf(logfile, sizeof(logfile), "%s/.vnc", homedir);
-    if (mkdir(logfile, 0755) == -1) {
-        if (errno != EEXIST) {
-            syslog(LOG_CRIT, "Failure creating \"%s\": %s", logfile, strerror(errno));
+    xdgstate = getenvp("XDG_STATE_HOME", envp);
+    if (xdgstate != NULL && xdgstate[0] == '/') {
+        fmt_len = snprintf(logdir, sizeof(logdir), "%s/tigervnc", xdgstate);
+        if (fmt_len >= sizeof(logdir)) {
+            syslog(LOG_CRIT, "Log dir path too long");
             _exit(EX_OSERR);
         }
+    } else {
+        fmt_len = snprintf(logdir, sizeof(logdir), "%s/.local/state/tigervnc", homedir);
+        if (fmt_len >= sizeof(logdir)) {
+            syslog(LOG_CRIT, "Log dir path too long");
+            _exit(EX_OSERR);
+        }
+    }
+
+    snprintf(legacy, sizeof(legacy), "%s/.vnc", homedir);
+    if (stat(logdir, &st) != 0 && stat(legacy, &st) == 0) {
+        syslog(LOG_WARNING, "~/.vnc is deprecated, please consult 'man vncsession' for paths to migrate to.");
+        strcpy(logdir, legacy);
 
 #ifdef HAVE_SELINUX
+        /* this is only needed to handle historical type changes for the legacy dir */
         int result;
-        if (selinux_file_context_verify(logfile, 0) == 0) {
-            result = selinux_restorecon(logfile, SELINUX_RESTORECON_RECURSE);
+        if (selinux_file_context_verify(legacy, 0) == 0) {
+            result = selinux_restorecon(legacy, SELINUX_RESTORECON_RECURSE);
 
             if (result < 0) {
-                syslog(LOG_WARNING, "Failure restoring SELinux context for \"%s\": %s", logfile, strerror(errno));
+                syslog(LOG_WARNING, "Failure restoring SELinux context for \"%s\": %s", legacy, strerror(errno));
             }
         }
 #endif
+    }
+
+    if (mkdir_p(logdir, 0755) == -1) {
+        if (errno != EEXIST) {
+            syslog(LOG_CRIT, "Could not create VNC state directory \"%s\": %s", logdir, strerror(errno));
+            _exit(EX_OSERR);
+        }
     }
 
     hostlen = sysconf(_SC_HOST_NAME_MAX);
@@ -395,9 +460,24 @@ redir_stdio(const char *homedir, const char *display)
         _exit(EX_OSERR);
     }
 
-    snprintf(logfile, sizeof(logfile), "%s/.vnc/%s%s.log",
-             homedir, hostname, display);
+    fmt_len = snprintf(logfile, sizeof(logfile), "/%s/%s%s.log", logdir, hostname, display);
+    if (fmt_len >= sizeof(logfile)) {
+        syslog(LOG_CRIT, "Log path too long");
+        _exit(EX_OSERR);
+    }
+    fmt_len = snprintf(logfile_old, sizeof(logfile_old), "/%s/%s%s.log.old", logdir, hostname, display);
+    if (fmt_len >= sizeof(logfile)) {
+        syslog(LOG_CRIT, "Log.old path too long");
+        _exit(EX_OSERR);
+    }
     free(hostname);
+
+    if (stat(logfile, &st) == 0) {
+        if (rename(logfile, logfile_old) != 0) {
+            syslog(LOG_CRIT, "Failure renaming log file \"%s\" to \"%s\": %s", logfile, logfile_old, strerror(errno));
+            _exit(EX_OSERR);
+        }
+    }
     fd = open(logfile, O_CREAT | O_WRONLY | O_TRUNC, 0644);
     if (fd == -1) {
         syslog(LOG_CRIT, "Failure creating log file \"%s\": %s", logfile, strerror(errno));
@@ -421,6 +501,10 @@ close_fds(void)
         syslog(LOG_CRIT, "opendir: %s", strerror(errno));
         _exit(EX_OSERR);
     }
+
+    // We'll close the file descriptor that the logging uses, so might
+    // as well do it cleanly
+    closelog();
 
     while ((entry = readdir(dir)) != NULL) {
         int fd;
@@ -466,7 +550,7 @@ run_script(const char *username, const char *display, char **envp)
 
     close_fds();
 
-    redir_stdio(pwent->pw_dir, display);
+    redir_stdio(pwent->pw_dir, display, envp);
 
     // execvpe() is not POSIX and is missing from older glibc
     // First clear out everything
@@ -486,7 +570,7 @@ run_script(const char *username, const char *display, char **envp)
 
     // Set up some basic environment for the script
     setenv("HOME", pwent->pw_dir, 1);
-    setenv("SHELL", pwent->pw_shell, 1);
+    setenv("SHELL", *pwent->pw_shell != '\0' ? pwent->pw_shell : "/bin/sh", 1);
     setenv("LOGNAME", pwent->pw_name, 1);
     setenv("USER", pwent->pw_name, 1);
     setenv("USERNAME", pwent->pw_name, 1);
@@ -495,12 +579,23 @@ run_script(const char *username, const char *display, char **envp)
     child_argv[1] = display;
     child_argv[2] = NULL;
 
+    closelog();
+
     execvp(child_argv[0], (char*const*)child_argv);
 
     // execvp failed
+    openlog("vncsession", LOG_PID, LOG_AUTH);
     syslog(LOG_CRIT, "execvp: %s", strerror(errno));
 
     _exit(EX_OSERR);
+}
+
+static void
+usage(void)
+{
+    fprintf(stderr, "Syntax:\n");
+    fprintf(stderr, "    vncsession [-D] <username> <display>\n");
+    exit(EX_USAGE);
 }
 
 int
@@ -511,14 +606,23 @@ main(int argc, char **argv)
 
     const char *username, *display;
 
-    if ((argc != 3) || (argv[2][0] != ':')) {
-        fprintf(stderr, "Syntax:\n");
-        fprintf(stderr, "    %s <username> <display>\n", argv[0]);
-        return EX_USAGE;
+    int opt, forking = 1;
+
+    while ((opt = getopt(argc, argv, "D")) != -1) {
+        switch (opt) {
+        case 'D':
+            forking = 0;
+            break;
+        default:
+            usage();
+        }
     }
 
-    username = argv[1];
-    display = argv[2];
+    if ((argc != optind + 2) || (argv[optind +1][0] != ':'))
+        usage();
+
+    username = argv[argc - 2];
+    display = argv[argc - 1];
 
     if (geteuid() != 0) {
         fprintf(stderr, "This program needs to be run as root!\n");
@@ -534,8 +638,10 @@ main(int argc, char **argv)
         return EX_OSERR;
     }
 
-    if (begin_daemon() == -1)
-        return EX_OSERR;
+    if (forking) {
+        if (begin_daemon() == -1)
+            return EX_OSERR;
+    }
 
     openlog("vncsession", LOG_PID, LOG_AUTH);
 
@@ -586,7 +692,8 @@ main(int argc, char **argv)
         fclose(f);
     }
 
-    finish_daemon();
+    if (forking)
+        finish_daemon();
 
     while (1) {
         int status;

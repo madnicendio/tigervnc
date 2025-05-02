@@ -35,7 +35,6 @@
 #include <rfb_win32/MonitorInfo.h>
 #include <rfb_win32/SDisplayCorePolling.h>
 #include <rfb_win32/SDisplayCoreWMHooks.h>
-#include <rfb/Exception.h>
 #include <rfb/LogWriter.h>
 #include <rfb/ledStates.h>
 
@@ -70,13 +69,13 @@ BoolParameter rfb::win32::SDisplay::disableEffects("DisableEffects",
 // -=- Constructor/Destructor
 
 SDisplay::SDisplay()
-  : server(0), pb(0), device(0),
-    core(0), ptr(0), kbd(0), clipboard(0),
-    inputs(0), monitor(0), cleanDesktop(0), cursor(0),
-    statusLocation(0), queryConnectionHandler(0), ledState(0)
+  : server(nullptr), pb(nullptr), device(nullptr),
+    core(nullptr), ptr(nullptr), kbd(nullptr), clipboard(nullptr),
+    inputs(nullptr), monitor(nullptr), cleanDesktop(nullptr), cursor(nullptr),
+    statusLocation(nullptr), queryConnectionHandler(nullptr), ledState(0)
 {
-  updateEvent.h = CreateEvent(0, TRUE, FALSE, 0);
-  terminateEvent.h = CreateEvent(0, TRUE, FALSE, 0);
+  updateEvent.h = CreateEvent(nullptr, TRUE, FALSE, nullptr);
+  terminateEvent.h = CreateEvent(nullptr, TRUE, FALSE, nullptr);
 }
 
 SDisplay::~SDisplay()
@@ -89,45 +88,49 @@ SDisplay::~SDisplay()
   // the VNCServer ought not to exist and therefore we shouldn't invoke any
   // methods on it.  Setting server to zero here ensures that stop() doesn't
   // call setPixelBuffer(0) on the server.
-  server = 0;
+  server = nullptr;
   if (core) stop();
 }
 
 
 // -=- SDesktop interface
 
-void SDisplay::start(VNCServer* vs)
+void SDisplay::init(VNCServer* vs)
 {
-  vlog.debug("starting");
+  server = vs;
+}
+
+void SDisplay::start()
+{
+  vlog.debug("Starting");
 
   // Try to make session zero the console session
   if (!inConsoleSession())
     setConsoleSession();
 
   // Start the SDisplay core
-  server = vs;
   startCore();
 
-  vlog.debug("started");
+  vlog.debug("Started");
 
   if (statusLocation) *statusLocation = true;
 }
 
 void SDisplay::stop()
 {
-  vlog.debug("stopping");
+  vlog.debug("Stopping");
 
   // If we successfully start()ed then perform the DisconnectAction
   if (core) {
     CurrentUserToken cut;
     if (stricmp(disconnectAction, "Logoff") == 0) {
       if (!cut.h)
-        vlog.info("ignoring DisconnectAction=Logoff - no current user");
+        vlog.info("Ignoring DisconnectAction=Logoff - no current user");
       else
         ExitWindowsEx(EWX_LOGOFF, 0);
     } else if (stricmp(disconnectAction, "Lock") == 0) {
       if (!cut.h) {
-        vlog.info("ignoring DisconnectAction=Lock - no current user");
+        vlog.info("Ignoring DisconnectAction=Lock - no current user");
       } else {
         LockWorkStation();
       }
@@ -135,12 +138,10 @@ void SDisplay::stop()
   }
 
   // Stop the SDisplayCore
-  if (server)
-    server->setPixelBuffer(0);
+  server->setPixelBuffer(nullptr);
   stopCore();
-  server = 0;
 
-  vlog.debug("stopped");
+  vlog.debug("Stopped");
 
   if (statusLocation) *statusLocation = false;
 }
@@ -154,7 +155,7 @@ void SDisplay::terminate()
 void SDisplay::queryConnection(network::Socket* sock,
                                const char* userName)
 {
-  assert(server != NULL);
+  assert(server != nullptr);
 
   if (queryConnectionHandler) {
     queryConnectionHandler->queryConnection(sock, userName);
@@ -170,12 +171,12 @@ void SDisplay::startCore() {
   // Currently, we just check whether we're in the console session, and
   //   fail if not
   if (!inConsoleSession())
-    throw rdr::Exception("Console is not session zero - oreconnect to restore Console sessin");
+    throw std::runtime_error("Console is not session zero - oreconnect to restore Console sessin");
   
   // Switch to the current input desktop
   if (rfb::win32::desktopChangeRequired()) {
     if (!rfb::win32::changeDesktop())
-      throw rdr::Exception("unable to switch into input desktop");
+      throw std::runtime_error("Unable to switch into input desktop");
   }
 
   // Initialise the change tracker and clipper
@@ -195,12 +196,12 @@ void SDisplay::startCore() {
       else
         core = new SDisplayCorePolling(this, &updates);
       core->setScreenRect(screenRect);
-    } catch (rdr::Exception& e) {
-      delete core; core = 0;
+    } catch (std::exception& e) {
+      delete core; core = nullptr;
       if (tryMethod == 0)
-        throw rdr::Exception("unable to access desktop");
+        throw std::runtime_error("Unable to access desktop");
       tryMethod--;
-      vlog.error("%s", e.str());
+      vlog.error("%s", e.what());
     }
   }
   vlog.info("Started %s", core->methodName());
@@ -232,16 +233,16 @@ void SDisplay::startCore() {
 void SDisplay::stopCore() {
   if (core)
     vlog.info("Stopping %s", core->methodName());
-  delete core; core = 0;
-  delete pb; pb = 0;
-  delete device; device = 0;
-  delete monitor; monitor = 0;
-  delete clipboard; clipboard = 0;
-  delete inputs; inputs = 0;
-  delete ptr; ptr = 0;
-  delete kbd; kbd = 0;
-  delete cleanDesktop; cleanDesktop = 0;
-  delete cursor; cursor = 0;
+  delete core; core = nullptr;
+  delete pb; pb = nullptr;
+  delete device; device = nullptr;
+  delete monitor; monitor = nullptr;
+  delete clipboard; clipboard = nullptr;
+  delete inputs; inputs = nullptr;
+  delete ptr; ptr = nullptr;
+  delete kbd; kbd = nullptr;
+  delete cleanDesktop; cleanDesktop = nullptr;
+  delete cursor; cursor = nullptr;
   ResetEvent(updateEvent);
 }
 
@@ -277,20 +278,20 @@ bool SDisplay::isRestartRequired() {
 
 
 void SDisplay::restartCore() {
-  vlog.info("restarting");
+  vlog.info("Restarting");
 
   // Stop the existing Core  related resources
   stopCore();
   try {
     // Start a new Core if possible
     startCore();
-    vlog.info("restarted");
-  } catch (rdr::Exception& e) {
+    vlog.info("Restarted");
+  } catch (std::exception& e) {
     // If startCore() fails then we MUST disconnect all clients,
     // to cause the server to stop() the desktop.
     // Otherwise, the SDesktop is in an inconsistent state
     // and the server will crash.
-    server->closeClients(e.str());
+    server->closeClients(e.what());
   }
 }
 
@@ -310,7 +311,7 @@ void SDisplay::handleClipboardData(const char* data) {
 }
 
 
-void SDisplay::pointerEvent(const Point& pos, int buttonmask) {
+void SDisplay::pointerEvent(const Point& pos, uint16_t buttonmask) {
   if (pb->getRect().contains(pos)) {
     Point screenPos = pos.translate(screenRect.tl);
     // - Check that the SDesktop doesn't need restarting
@@ -350,7 +351,7 @@ bool SDisplay::checkLedState() {
 
 void
 SDisplay::notifyClipboardChanged(bool available) {
-  vlog.debug("clipboard text changed");
+  vlog.debug("Clipboard text changed");
   if (server)
     server->announceClipboard(available);
 }
@@ -360,15 +361,15 @@ void
 SDisplay::notifyDisplayEvent(WMMonitor::Notifier::DisplayEventType evt) {
   switch (evt) {
   case WMMonitor::Notifier::DisplaySizeChanged:
-    vlog.debug("desktop size changed");
+    vlog.debug("Desktop size changed");
     recreatePixelBuffer();
     break;
   case WMMonitor::Notifier::DisplayPixelFormatChanged:
-    vlog.debug("desktop format changed");
+    vlog.debug("Desktop format changed");
     recreatePixelBuffer();
     break;
   default:
-    vlog.error("unknown display event received");
+    vlog.error("Unknown display event received");
   }
 }
 
@@ -380,7 +381,7 @@ SDisplay::processEvent(HANDLE event) {
 
     // - If the SDisplay isn't even started then quit now
     if (!core) {
-      vlog.error("not start()ed");
+      vlog.error("Not start()ed");
       return;
     }
 
@@ -398,8 +399,8 @@ SDisplay::processEvent(HANDLE event) {
       // - Flush any updates from the core
       try {
         core->flushUpdates();
-      } catch (rdr::Exception& e) {
-        vlog.error("%s", e.str());
+      } catch (std::exception& e) {
+        vlog.error("%s", e.what());
         restartCore();
         return;
       }
@@ -414,7 +415,7 @@ SDisplay::processEvent(HANDLE event) {
 
         // Update the cursor shape
         if (set_cursor)
-          pb->setCursor(info.visible ? info.cursor : 0, server);
+          pb->setCursor(info.visible ? info.cursor : nullptr, server);
 
         // Update the cursor position
         // NB: First translate from Screen coordinates to Desktop
@@ -433,7 +434,7 @@ SDisplay::processEvent(HANDLE event) {
     }
     return;
   }
-  throw rdr::Exception("No such event");
+  throw std::runtime_error("No such event");
 }
 
 
@@ -445,14 +446,14 @@ SDisplay::recreatePixelBuffer(bool force) {
   //   If no device is specified, open entire screen using GetDC().
   //   Opening the whole display with CreateDC doesn't work on multi-monitor
   //   systems for some reason.
-  DeviceContext* new_device = 0;
+  DeviceContext* new_device = nullptr;
   if (strlen(displayDevice) > 0) {
     vlog.info("Attaching to device %s", (const char*)displayDevice);
     new_device = new DeviceDC(displayDevice);
   }
   if (!new_device) {
     vlog.info("Attaching to virtual desktop");
-    new_device = new WindowDC(0);
+    new_device = new WindowDC(nullptr);
   }
 
   // Get the coordinates of the specified dispay device
@@ -478,14 +479,14 @@ SDisplay::recreatePixelBuffer(bool force) {
   flushChangeTracker();
 
   // Delete the old pixelbuffer and device context
-  vlog.debug("deleting old pixel buffer & device");
+  vlog.debug("Deleting old pixel buffer & device");
   if (pb)
     delete pb;
   if (device)
     delete device;
 
   // Create a DeviceFrameBuffer attached to the new device
-  vlog.debug("creating pixel buffer");
+  vlog.debug("Creating pixel buffer");
   DeviceFrameBuffer* new_buffer = new DeviceFrameBuffer(*new_device);
 
   // Replace the old PixelBuffer

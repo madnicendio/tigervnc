@@ -31,15 +31,11 @@ extern "C" {
 namespace rfb {
   class H264LibavDecoderContext : public H264DecoderContext {
     public:
-      H264LibavDecoderContext(const Rect &r) : H264DecoderContext(r) {}
-      ~H264LibavDecoderContext() { freeCodec(); }
+      H264LibavDecoderContext(const Rect &r);
+      ~H264LibavDecoderContext();
 
-      virtual void decode(const uint8_t* h264_buffer, uint32_t len,
-                          ModifiablePixelBuffer* pb);
-
-    protected:
-      virtual bool initCodec();
-      virtual void freeCodec();
+      void decode(const uint8_t* h264_buffer, uint32_t len,
+                  ModifiablePixelBuffer* pb) override;
 
     private:
       uint8_t* makeH264WorkBuffer(const uint8_t* buffer, uint32_t len);
@@ -47,8 +43,8 @@ namespace rfb {
       AVCodecContext *avctx;
       AVCodecParserContext *parser;
       AVFrame* frame;
+      AVFrame* rgbFrame = nullptr;
       SwsContext* sws;
-      uint8_t* swsBuffer;
       uint8_t* h264WorkBuffer;
       uint32_t h264WorkBufferLength;
   };

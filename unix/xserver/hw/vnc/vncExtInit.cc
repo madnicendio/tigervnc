@@ -1,5 +1,5 @@
 /* Copyright (C) 2002-2005 RealVNC Ltd.  All Rights Reserved.
- * Copyright 2011-2019 Pierre Ossman for Cendio AB
+ * Copyright 2011-2024 Pierre Ossman for Cendio AB
  * 
  * This is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -89,7 +89,7 @@ rfb::BoolParameter localhostOnly("localhost",
                                  "Only allow connections from localhost",
                                  false);
 rfb::StringParameter interface("interface",
-                               "listen on the specified network address",
+                               "Listen on the specified network address",
                                "all");
 rfb::BoolParameter avoidShiftNumLock("AvoidShiftNumLock",
                                      "Avoid fake Shift presses for keys affected by NumLock.",
@@ -114,10 +114,10 @@ static const char* defaultDesktopName()
     return "";
 
   struct passwd* pwent = getpwuid(getuid());
-  if (pwent == NULL)
+  if (pwent == nullptr)
     return "";
 
-  size_t len = snprintf(NULL, 0, "%s@%s", pwent->pw_name, hostname.data());
+  size_t len = snprintf(nullptr, 0, "%s@%s", pwent->pw_name, hostname.data());
   if (len < 0)
     return "";
 
@@ -141,7 +141,7 @@ static PixelFormat vncGetPixelFormat(int scrIdx)
                      &redMask, &greenMask, &blueMask);
 
   if (!trueColour) {
-    vlog.error("pseudocolour not supported");
+    vlog.error("Pseudocolour not supported");
     abort();
   }
 
@@ -173,13 +173,13 @@ static void parseOverrideList(const char *text, ParamSet &out)
 void vncExtensionInit(void)
 {
   if (vncExtGeneration == vncGetServerGeneration()) {
-    vlog.error("vncExtensionInit: called twice in same generation?");
+    vlog.error("vncExtensionInit: Called twice in same generation?");
     return;
   }
   vncExtGeneration = vncGetServerGeneration();
 
   if (vncGetScreenCount() > MAXSCREENS)
-    vncFatalError("vncExtensionInit: too many screens\n");
+    vncFatalError("vncExtensionInit: Too many screens\n");
 
   vncAddExtension();
 
@@ -229,6 +229,7 @@ void vncExtensionInit(void)
         }
 
         if (!inetd && rfbport != -1) {
+          std::list<network::SocketListener*> tcp_listeners;
           const char *addr = interface;
           int port = rfbport;
           if (port == 0) port = 5900 + atoi(vncGetDisplay());
@@ -236,14 +237,20 @@ void vncExtensionInit(void)
           if (strcasecmp(addr, "all") == 0)
             addr = 0;
           if (localhostOnly)
-            network::createLocalTcpListeners(&listeners, port);
+            network::createLocalTcpListeners(&tcp_listeners, port);
           else
-            network::createTcpListeners(&listeners, addr, port);
+            network::createTcpListeners(&tcp_listeners, addr, port);
 
-          vlog.info("Listening for VNC connections on %s interface(s), port %d",
-                    localhostOnly ? "local" : (const char*)interface,
-                    port);
+          if (!tcp_listeners.empty()) {
+            listeners.splice (listeners.end(), tcp_listeners);
+            vlog.info("Listening for VNC connections on %s interface(s), port %d",
+                      localhostOnly ? "local" : (const char*)interface,
+                      port);
+          }
         }
+
+        if (!inetd && listeners.empty())
+          throw std::runtime_error("No path or port configured for incoming connections");
 
         PixelFormat pf = vncGetPixelFormat(scr);
 
@@ -256,19 +263,19 @@ void vncExtensionInit(void)
                                           vncGetScreenHeight(),
                                           vncFbptr[scr],
                                           vncFbstride[scr]);
-        vlog.info("created VNC server for screen %d", scr);
+        vlog.info("Created VNC server for screen %d", scr);
 
         if (scr == 0 && vncInetdSock != -1 && listeners.empty()) {
           network::Socket* sock = new network::TcpSocket(vncInetdSock);
-          desktop[scr]->addClient(sock, false);
-          vlog.info("added inetd sock");
+          desktop[scr]->addClient(sock, false, false);
+          vlog.info("Added inetd sock");
         }
       }
 
       vncHooksInit(scr);
     }
-  } catch (rdr::Exception& e) {
-    vncFatalError("vncExtInit: %s\n",e.str());
+  } catch (std::exception& e) {
+    vncFatalError("vncExtInit: %s\n",e.what());
   }
 
   vncRegisterBlockHandlers();
@@ -279,10 +286,10 @@ void vncExtensionClose(void)
   try {
     for (int scr = 0; scr < vncGetScreenCount(); scr++) {
       delete desktop[scr];
-      desktop[scr] = NULL;
+      desktop[scr] = nullptr;
     }
-  } catch (rdr::Exception& e) {
-    vncFatalError("vncExtInit: %s\n",e.str());
+  } catch (std::exception& e) {
+    vncFatalError("vncExtInit: %s\n",e.what());
   }
 }
 
@@ -336,13 +343,13 @@ void vncSendClipboardData(const char* data)
     desktop[scr]->sendClipboardData(data);
 }
 
-int vncConnectClient(const char *addr)
+int vncConnectClient(const char *addr, int viewOnly)
 {
   if (strlen(addr) == 0) {
     try {
       desktop[0]->disconnectClients();
-    } catch (rdr::Exception& e) {
-      vlog.error("Disconnecting all clients: %s",e.str());
+    } catch (std::exception& e) {
+      vlog.error("Disconnecting all clients: %s", e.what());
       return -1;
     }
     return 0;
@@ -355,9 +362,11 @@ int vncConnectClient(const char *addr)
 
   try {
     network::Socket* sock = new network::TcpSocket(host.c_str(), port);
-    desktop[0]->addClient(sock, true);
-  } catch (rdr::Exception& e) {
-    vlog.error("Reverse connection: %s",e.str());
+    vlog.info("Reverse connection: %s:%d%s", host.c_str(), port,
+              viewOnly ? " (view only)" : "");
+    desktop[0]->addClient(sock, true, (bool)viewOnly);
+  } catch (std::exception& e) {
+    vlog.error("Reverse connection: %s", e.what());
     return -1;
   }
 
@@ -453,8 +462,8 @@ void vncPostScreenResize(int scrIdx, int success, int width, int height)
       desktop[scrIdx]->setFramebuffer(width, height,
                                       vncFbptr[scrIdx],
                                       vncFbstride[scrIdx]);
-    } catch (rdr::Exception& e) {
-      vncFatalError("vncPostScreenResize: %s\n", e.str());
+    } catch (std::exception& e) {
+      vncFatalError("vncPostScreenResize: %s\n", e.what());
     }
   }
 
@@ -470,20 +479,42 @@ void vncRefreshScreenLayout(int scrIdx)
 {
   try {
     desktop[scrIdx]->refreshScreenLayout();
-  } catch (rdr::Exception& e) {
-    vncFatalError("vncRefreshScreenLayout: %s\n", e.str());
+  } catch (std::exception& e) {
+    vncFatalError("vncRefreshScreenLayout: %s\n", e.what());
   }
 }
 
-int vncOverrideParam(const char *nameAndValue)
+uint64_t vncGetMsc(int scrIdx)
 {
-  const char* equalSign = strchr(nameAndValue, '=');
-  if (!equalSign)
+  try {
+    return desktop[scrIdx]->getMsc();
+  } catch (std::exception& e) {
+    vncFatalError("vncGetMsc: %s\n", e.what());
+  }
+}
+
+void vncQueueMsc(int scrIdx, uint64_t id, uint64_t msc)
+{
+  try {
+    desktop[scrIdx]->queueMsc(id, msc);
+  } catch (std::exception& e) {
+    vncFatalError("vncQueueMsc: %s\n", e.what());
+  }
+}
+
+void vncAbortMsc(int scrIdx, uint64_t id)
+{
+  try {
+    desktop[scrIdx]->abortMsc(id);
+  } catch (std::exception& e) {
+    vncFatalError("vncAbortMsc: %s\n", e.what());
+  }
+}
+
+int vncOverrideParam(const char *param, const char *value)
+{
+  if (allowOverrideSet.find(param) == allowOverrideSet.end())
     return 0;
 
-  std::string key(nameAndValue, equalSign);
-  if (allowOverrideSet.find(key) == allowOverrideSet.end())
-    return 0;
-
-  return rfb::Configuration::setParam(nameAndValue);
+  return rfb::Configuration::setParam(param, value);
 }

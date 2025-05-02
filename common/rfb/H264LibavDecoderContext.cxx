@@ -18,6 +18,12 @@
  * USA.
  */
 
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
+
+#include <new>
+#include <stdexcept>
 
 extern "C" {
 #include <libavutil/imgutils.h>
@@ -30,43 +36,31 @@ extern "C" {
 #define FFMPEG_INIT_PACKET_DEPRECATED
 #endif
 
-#include <rfb/Exception.h>
-#include <rfb/LogWriter.h>
 #include <rfb/PixelBuffer.h>
 #include <rfb/H264LibavDecoderContext.h>
 
 using namespace rfb;
 
-static LogWriter vlog("H264LibavDecoderContext");
-
-bool H264LibavDecoderContext::initCodec() {
-  os::AutoMutex lock(&mutex);
-
-  sws = NULL;
-  swsBuffer = NULL;
-  h264WorkBuffer = NULL;
+H264LibavDecoderContext::H264LibavDecoderContext(const Rect& r)
+  : H264DecoderContext(r)
+{
+  sws = nullptr;
+  h264WorkBuffer = nullptr;
   h264WorkBufferLength = 0;
 
   const AVCodec *codec = avcodec_find_decoder(AV_CODEC_ID_H264);
   if (!codec)
-  {
-    vlog.error("Codec not found");
-    return false;
-  }
+    throw std::runtime_error("Codec not found");
 
   parser = av_parser_init(codec->id);
   if (!parser)
-  {
-    vlog.error("Could not create H264 parser");
-    return false;
-  }
+    throw std::runtime_error("Could not create H264 parser");
 
   avctx = avcodec_alloc_context3(codec);
   if (!avctx)
   {
     av_parser_close(parser);
-    vlog.error("Could not allocate video codec context");
-    return false;
+    throw std::runtime_error("Could not allocate video codec context");
   }
 
   frame = av_frame_alloc();
@@ -74,37 +68,26 @@ bool H264LibavDecoderContext::initCodec() {
   {
     av_parser_close(parser);
     avcodec_free_context(&avctx);
-    vlog.error("Could not allocate video frame");
-    return false;
+    throw std::runtime_error("Could not allocate video frame");
   }
 
-  if (avcodec_open2(avctx, codec, NULL) < 0)
+  if (avcodec_open2(avctx, codec, nullptr) < 0)
   {
     av_parser_close(parser);
     avcodec_free_context(&avctx);
     av_frame_free(&frame);
-    vlog.error("Could not open codec");
-    return false;
+    throw std::runtime_error("Could not open video codec");
   }
-
-  int numBytes = av_image_get_buffer_size(AV_PIX_FMT_RGB32, rect.width(), rect.height(), 1);
-  swsBuffer = new uint8_t[numBytes];
-
-  initialized = true;
-  return true;
 }
 
-void H264LibavDecoderContext::freeCodec() {
-  os::AutoMutex lock(&mutex);
-
-  if (!initialized)
-    return;
+H264LibavDecoderContext::~H264LibavDecoderContext()
+{
   av_parser_close(parser);
   avcodec_free_context(&avctx);
+  av_frame_free(&rgbFrame);
   av_frame_free(&frame);
-  delete[] swsBuffer;
+  sws_freeContext(sws);
   free(h264WorkBuffer);
-  initialized = false;
 }
 
 // We need to reallocate buffer because AVPacket uses non-const pointer.
@@ -117,8 +100,8 @@ uint8_t* H264LibavDecoderContext::makeH264WorkBuffer(const uint8_t* buffer, uint
   if (!h264WorkBuffer || reserve_len > h264WorkBufferLength)
   {
     h264WorkBuffer = (uint8_t*)realloc(h264WorkBuffer, reserve_len);
-    if (h264WorkBuffer == NULL) {
-      throw Exception("H264LibavDecoderContext: Unable to allocate memory");
+    if (h264WorkBuffer == nullptr) {
+      throw std::bad_alloc();
     }
     h264WorkBufferLength = reserve_len;
   }
@@ -131,9 +114,6 @@ uint8_t* H264LibavDecoderContext::makeH264WorkBuffer(const uint8_t* buffer, uint
 void H264LibavDecoderContext::decode(const uint8_t* h264_in_buffer,
                                      uint32_t len,
                                      ModifiablePixelBuffer* pb) {
-  os::AutoMutex lock(&mutex);
-  if (!initialized)
-    return;
   uint8_t* h264_work_buffer = makeH264WorkBuffer(h264_in_buffer, len);
 
 #ifdef FFMPEG_INIT_PACKET_DEPRECATED
@@ -148,19 +128,15 @@ void H264LibavDecoderContext::decode(const uint8_t* h264_in_buffer,
   while (len)
   {
     ret = av_parser_parse2(parser, avctx, &packet->data, &packet->size, h264_work_buffer, len, AV_NOPTS_VALUE, AV_NOPTS_VALUE, 0);
+    // Silently ignore errors, hoping its a temporary encoding glitch
     if (ret < 0)
-    {
-      vlog.error("Error while parsing");
       break;
-    }
     // We need to slap on tv to make it work here (don't ask me why)
     if (!packet->size && len == static_cast<uint32_t>(ret))
       ret = av_parser_parse2(parser, avctx, &packet->data, &packet->size, h264_work_buffer, len, AV_NOPTS_VALUE, AV_NOPTS_VALUE, 0);
+    // Silently ignore errors, hoping its a temporary encoding glitch
     if (ret < 0)
-    {
-      vlog.error("Error while parsing");
       break;
-    }
     h264_work_buffer += ret;
     len -= ret;
 
@@ -177,34 +153,28 @@ void H264LibavDecoderContext::decode(const uint8_t* h264_in_buffer,
 #ifndef FFMPEG_DECODE_VIDEO2_DEPRECATED
     int got_frame;
     ret = avcodec_decode_video2(avctx, frame, &got_frame, packet);
+    // Silently ignore errors, hoping its a temporary encoding glitch
     if (ret < 0 || !got_frame)
-    {
-      vlog.error("Error during decoding");
       break;
-    }
 #else
     ret = avcodec_send_packet(avctx, packet);
+    // Silently ignore errors, hoping its a temporary encoding glitch
     if (ret < 0)
-    {
-      vlog.error("Error sending a packet to decoding");
       break;
-    }
 
     ret = avcodec_receive_frame(avctx, frame);
     if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF)
       break;
-    else if (ret < 0)
-    {
-      vlog.error("Error during decoding");
+    // Silently ignore errors, hoping its a temporary encoding glitch
+    if (ret < 0)
       break;
-    }
 #endif
     frames_received++;
   }
 
 #ifdef FFMPEG_INIT_PACKET_DEPRECATED
   packet->size = 0;
-  packet->data = NULL;
+  packet->data = nullptr;
   av_packet_free(&packet);
 #else
   delete packet;
@@ -218,13 +188,39 @@ void H264LibavDecoderContext::decode(const uint8_t* h264_in_buffer,
 
   sws = sws_getCachedContext(sws, frame->width, frame->height, avctx->pix_fmt,
                              frame->width, frame->height, AV_PIX_FMT_RGB32,
-                             0, NULL, NULL, NULL);
+                             SWS_POINT, nullptr, nullptr, nullptr);
 
-  int stride;
-  pb->getBuffer(rect, &stride);
-  int dst_linesize = stride * pb->getPF().bpp/8;  // stride is in pixels, linesize is in bytes (stride x4). We need bytes
+  int inFull, outFull, brightness, contrast, saturation;
+  const int* inTable;
+  const int* outTable;
 
-  sws_scale(sws, frame->data, frame->linesize, 0, frame->height, &swsBuffer, &dst_linesize);
+  sws_getColorspaceDetails(sws, (int**)&inTable, &inFull, (int**)&outTable,
+      &outFull, &brightness, &contrast, &saturation);
+  if (frame->colorspace != AVCOL_SPC_UNSPECIFIED) {
+    inTable = sws_getCoefficients(frame->colorspace);
+  }
+  if (frame->color_range != AVCOL_RANGE_UNSPECIFIED) {
+    inFull = frame->color_range == AVCOL_RANGE_JPEG;
+  }
+  sws_setColorspaceDetails(sws, inTable, inFull, outTable, outFull, brightness,
+      contrast, saturation);
 
-  pb->imageRect(rect, swsBuffer, stride);
+  if (rgbFrame && (rgbFrame->width != frame->width || rgbFrame->height != frame->height)) {
+    av_frame_free(&rgbFrame);
+
+  }
+
+  if (!rgbFrame) {
+    rgbFrame = av_frame_alloc();
+    // TODO: Can we really assume that the pixel format will always be RGB32?
+    rgbFrame->format = AV_PIX_FMT_RGB32;
+    rgbFrame->width = frame->width;
+    rgbFrame->height = frame->height;
+    av_frame_get_buffer(rgbFrame, 0);
+  }
+
+  sws_scale(sws, frame->data, frame->linesize, 0, frame->height, rgbFrame->data,
+            rgbFrame->linesize);
+
+  pb->imageRect(rect, rgbFrame->data[0], rgbFrame->linesize[0] / 4);
 }

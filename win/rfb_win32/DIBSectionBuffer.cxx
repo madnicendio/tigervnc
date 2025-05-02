@@ -21,6 +21,8 @@
 #include <config.h>
 #endif
 
+#include <rdr/Exception.h>
+
 #include <rfb_win32/DIBSectionBuffer.h>
 #include <rfb_win32/DeviceContext.h>
 #include <rfb_win32/BitmapInfo.h>
@@ -33,11 +35,11 @@ static LogWriter vlog("DIBSectionBuffer");
 
 
 DIBSectionBuffer::DIBSectionBuffer(HWND window_)
-  : bitmap(0), window(window_), device(0) {
+  : bitmap(nullptr), window(window_), device(nullptr) {
 }
 
 DIBSectionBuffer::DIBSectionBuffer(HDC device_)
-  : bitmap(0), window(0), device(device_) {
+  : bitmap(nullptr), window(nullptr), device(device_) {
 }
 
 DIBSectionBuffer::~DIBSectionBuffer() {
@@ -52,11 +54,11 @@ inline void initMaxAndShift(DWORD mask, int* max, int* shift) {
 }
 
 void DIBSectionBuffer::initBuffer(const PixelFormat& pf, int w, int h) {
-  HBITMAP new_bitmap = 0;
-  uint8_t* new_data = 0;
+  HBITMAP new_bitmap = nullptr;
+  uint8_t* new_data = nullptr;
 
   if (!pf.trueColour)
-    throw rfb::Exception("palette format not supported");
+    throw std::invalid_argument("Palette format not supported");
 
   format = pf;
 
@@ -78,23 +80,23 @@ void DIBSectionBuffer::initBuffer(const PixelFormat& pf, int w, int h) {
     // Create a DIBSection to draw into
     if (device)
       new_bitmap = ::CreateDIBSection(device, (BITMAPINFO*)&bi.bmiHeader, iUsage,
-                                      (void**)&new_data, NULL, 0);
+                                      (void**)&new_data, nullptr, 0);
     else
       new_bitmap = ::CreateDIBSection(WindowDC(window), (BITMAPINFO*)&bi.bmiHeader, iUsage,
-                                      (void**)&new_data, NULL, 0);
+                                      (void**)&new_data, nullptr, 0);
 
     if (!new_bitmap) {
       int err = GetLastError();
-      throw rdr::SystemException("unable to create DIB section", err);
+      throw rdr::win32_error("Unable to create DIB section", err);
     }
 
     vlog.debug("recreateBuffer()");
   } else {
-    vlog.debug("one of area or format not set");
+    vlog.debug("One of area or format not set");
   }
 
   if (new_bitmap && bitmap) {
-    vlog.debug("preserving bitmap contents");
+    vlog.debug("Preserving bitmap contents");
 
     // Copy the contents across
     if (device) {
@@ -112,8 +114,8 @@ void DIBSectionBuffer::initBuffer(const PixelFormat& pf, int w, int h) {
   if (bitmap) {
     // Delete the old bitmap
     DeleteObject(bitmap);
-    bitmap = 0;
-    setBuffer(0, 0, NULL, 0);
+    bitmap = nullptr;
+    setBuffer(0, 0, nullptr, 0);
   }
 
   if (new_bitmap) {
@@ -128,7 +130,7 @@ void DIBSectionBuffer::initBuffer(const PixelFormat& pf, int w, int h) {
     // Determine the *actual* DIBSection format
     DIBSECTION ds;
     if (!GetObject(bitmap, sizeof(ds), &ds))
-      throw rdr::SystemException("GetObject", GetLastError());
+      throw rdr::win32_error("GetObject", GetLastError());
 
     // Correct the "stride" of the DIB
     // *** This code DWORD aligns each row - is that right???
@@ -137,7 +139,7 @@ void DIBSectionBuffer::initBuffer(const PixelFormat& pf, int w, int h) {
     if (bytesPerRow % 4) {
       bytesPerRow += 4 - (bytesPerRow % 4);
       new_stride = (bytesPerRow * 8) / format.bpp;
-      vlog.info("adjusting DIB stride: %d to %d", w, new_stride);
+      vlog.info("Adjusting DIB stride: %d to %d", w, new_stride);
     }
 
     setBuffer(w, h, new_data, new_stride);
@@ -158,7 +160,7 @@ void DIBSectionBuffer::initBuffer(const PixelFormat& pf, int w, int h) {
       bits = bits >> 1;
     }
     if (depth > bpp)
-      throw Exception("Bad DIBSection format (depth exceeds bpp)");
+      throw std::runtime_error("Bad DIBSection format (depth exceeds bpp)");
 
     format = PixelFormat(bpp, depth, false, true,
                          redMax, greenMax, blueMax,

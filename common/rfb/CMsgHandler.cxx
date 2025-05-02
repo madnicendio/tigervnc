@@ -59,11 +59,6 @@ void CMsgHandler::setExtendedDesktopSize(unsigned reason, unsigned result,
   server.setDimensions(width, height, layout);
 }
 
-void CMsgHandler::setPixelFormat(const PixelFormat& pf)
-{
-  server.setPF(pf);
-}
-
 void CMsgHandler::setName(const char* name)
 {
   server.setName(name);
@@ -78,6 +73,11 @@ void CMsgHandler::fence(uint32_t /*flags*/, unsigned /*len*/,
 void CMsgHandler::endOfContinuousUpdates()
 {
   server.supportsContinuousUpdates = true;
+}
+
+void CMsgHandler::supportsExtendedMouseButtons()
+{
+  server.supportsExtendedMouseButtons = true;
 }
 
 void CMsgHandler::supportsQEMUKeyEvent()

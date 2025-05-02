@@ -28,6 +28,8 @@
 #include <rdr/InStream.h>
 #if !defined(WIN32) && !defined(__APPLE__)
 #include <rfb/UnixPasswordValidator.h>
+#include <unistd.h>
+#include <pwd.h>
 #endif
 #ifdef WIN32
 #include <rfb/WinPasswdValidator.h>
@@ -53,20 +55,27 @@ bool PasswordValidator::validUser(const char* username)
   for (size_t i = 0; i < users.size(); i++) {
     if (users[i] == "*")
       return true;
+#if !defined(WIN32) && !defined(__APPLE__)
+    if (users[i] == "%u") {
+      struct passwd *pw = getpwnam(username);
+      if (pw && pw->pw_uid == getuid())
+        return true;
+    }
+#endif
     if (users[i] == username)
       return true;
   }
   return false;
 }
 
-SSecurityPlain::SSecurityPlain(SConnection* sc) : SSecurity(sc)
+SSecurityPlain::SSecurityPlain(SConnection* sc_) : SSecurity(sc_)
 {
 #ifdef WIN32
   valid = new WinPasswdValidator();
 #elif !defined(__APPLE__)
   valid = new UnixPasswordValidator();
 #else
-  valid = NULL;
+  valid = nullptr;
 #endif
 
   state = 0;
@@ -78,7 +87,7 @@ bool SSecurityPlain::processMsg()
   char password[1024];
 
   if (!valid)
-    throw AuthFailureException("No password validator configured");
+    throw std::logic_error("No password validator configured");
 
   if (state == 0) {
     if (!is->hasData(8))
@@ -86,11 +95,11 @@ bool SSecurityPlain::processMsg()
 
     ulen = is->readU32();
     if (ulen >= sizeof(username))
-      throw AuthFailureException("Too long username");
+      throw auth_error("Too long username");
 
     plen = is->readU32();
     if (plen >= sizeof(password))
-      throw AuthFailureException("Too long password");
+      throw auth_error("Too long password");
 
     state = 1;
   }
@@ -105,7 +114,7 @@ bool SSecurityPlain::processMsg()
     username[ulen] = 0;
     plen = 0;
     if (!valid->validate(sc, username, password))
-      throw AuthFailureException("invalid password or username");
+      throw auth_error("Authentication failed");
   }
 
   return true;

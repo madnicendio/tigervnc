@@ -28,26 +28,39 @@
 #include <rfb/SConnection.h>
 #include <rfb/ZRLEEncoder.h>
 #include <rfb/Configuration.h>
+#include <rfb/LogWriter.h>
 
 using namespace rfb;
 
-IntParameter zlibLevel("ZlibLevel","Zlib compression level",-1);
+static LogWriter vlog("ZRLEEncoder");
 
-ZRLEEncoder::ZRLEEncoder(SConnection* conn)
-  : Encoder(conn, encodingZRLE, EncoderPlain, 127),
-  zos(0,zlibLevel), mos(129*1024)
+IntParameter zlibLevel("ZlibLevel","[DEPRECATED] Zlib compression level",-1);
+
+ZRLEEncoder::ZRLEEncoder(SConnection* conn_)
+  : Encoder(conn_, encodingZRLE, EncoderPlain, 127),
+  zos(nullptr, 2), mos(129*1024)
 {
+  if (zlibLevel != -1) {
+    vlog.info("Warning: The ZlibLevel option is deprecated and is "
+              "ignored by the server. The compression level can be set "
+              "by the client instead.");
+  }
   zos.setUnderlying(&mos);
 }
 
 ZRLEEncoder::~ZRLEEncoder()
 {
-  zos.setUnderlying(NULL);
+  zos.setUnderlying(nullptr);
 }
 
 bool ZRLEEncoder::isSupported()
 {
   return conn->client.supportsEncoding(encodingZRLE);
+}
+
+void ZRLEEncoder::setCompressLevel(int level)
+{
+  zos.setCompressionLevel(level);
 }
 
 void ZRLEEncoder::writeRect(const PixelBuffer* pb, const Palette& palette)

@@ -43,10 +43,10 @@ public:
   virtual void start(int width, int height);
   virtual void stop();
 
-  virtual void draw();
+  void draw() override;
 
 protected:
-  virtual void flush();
+  void flush() override;
 
   void update();
   virtual void changefb();
@@ -63,17 +63,17 @@ protected:
 
 class PartialTestWindow: public TestWindow {
 protected:
-  virtual void changefb();
+  void changefb() override;
 };
 
 class OverlayTestWindow: public PartialTestWindow {
 public:
   OverlayTestWindow();
 
-  virtual void start(int width, int height);
-  virtual void stop();
+  void start(int width, int height) override;
+  void stop() override;
 
-  virtual void draw();
+  void draw() override;
 
 protected:
   Surface* overlay;
@@ -82,7 +82,7 @@ protected:
 
 TestWindow::TestWindow() :
   Fl_Window(0, 0, "Framebuffer Performance Test"),
-  fb(NULL)
+  fb(nullptr)
 {
 }
 
@@ -116,7 +116,7 @@ void TestWindow::stop()
   hide();
 
   delete fb;
-  fb = NULL;
+  fb = nullptr;
 
   Fl::remove_idle(timer, this);
 }
@@ -208,7 +208,7 @@ void PartialTestWindow::changefb()
 }
 
 OverlayTestWindow::OverlayTestWindow() :
-  overlay(NULL), offscreen(NULL)
+  overlay(nullptr), offscreen(nullptr)
 {
 }
 
@@ -224,7 +224,7 @@ void OverlayTestWindow::start(int width, int height)
 #if !defined(__APPLE__)
   offscreen = new Surface(w(), h());
 #else
-  offscreen = NULL;
+  offscreen = nullptr;
 #endif
 }
 
@@ -233,9 +233,9 @@ void OverlayTestWindow::stop()
   PartialTestWindow::stop();
 
   delete offscreen;
-  offscreen = NULL;
+  offscreen = nullptr;
   delete overlay;
-  overlay = NULL;
+  overlay = nullptr;
 }
 
 void OverlayTestWindow::draw()
@@ -299,7 +299,7 @@ static void dosubtest(TestWindow* win, int width, int height,
 
   win->start(width, height);
 
-  gettimeofday(&start, NULL);
+  gettimeofday(&start, nullptr);
   while (rfb::msSince(&start) < 3000)
     Fl::wait();
 
@@ -344,7 +344,7 @@ static void dotest(TestWindow* win)
 
   // We are restricted by some delay, e.g. refresh rate
   if (is_constant(frames[0]/time[0], frames[2]/time[2])) {
-    fprintf(stderr, "WARNING: Fixed delay dominating updates.\n\n");
+    fprintf(stderr, "Warning: Fixed delay dominating updates.\n\n");
     delay = time[2]/frames[2];
     rate = 0.0;
   }
@@ -359,7 +359,7 @@ static void dotest(TestWindow* win)
   // We can hit cache limits that causes performance to drop
   // with increasing update size, screwing up our calculations
   if ((pixels[2] / time[2]) < (pixels[0] / time[0] * 0.9)) {
-    fprintf(stderr, "WARNING: Unexpected behaviour. Measurement unreliable.\n\n");
+    fprintf(stderr, "Warning: Unexpected behaviour. Measurement unreliable.\n\n");
 
     // We can't determine the proportions between these, so divide the
     // time spent evenly

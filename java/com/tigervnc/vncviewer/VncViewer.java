@@ -61,9 +61,9 @@ import static com.tigervnc.vncviewer.Parameters.*;
 public class VncViewer implements Runnable {
 
   public static final String aboutText =
-    new String("TigerVNC Java Viewer v%s (%s)%n"+
+    new String("TigerVNC Java viewer v%s (%s)%n"+
                "Built on %s at %s%n"+
-               "Copyright (C) 1999-2023 TigerVNC Team and many others (see README.rst)%n"+
+               "Copyright (C) 1999-2025 TigerVNC team and many others (see README.rst)%n"+
                "See https://www.tigervnc.org for information on TigerVNC.");
 
   public static String version = null;
@@ -212,6 +212,8 @@ public class VncViewer implements Runnable {
 
     // Check if the server name in reality is a configuration file
     potentiallyLoadConfigurationFile(vncServerName);
+
+    migrateDeprecatedOptions();
   }
 
   public static void usage() {
@@ -237,7 +239,7 @@ public class VncViewer implements Runnable {
 
     Configuration.listParams(79, 14);
     String propertiesString = ("\n"+
-"System Properties (adapted from the TurboVNC vncviewer man page)\n"+
+"System properties (adapted from the TurboVNC vncviewer man page)\n"+
 "  When started with the -via option, vncviewer reads the VNC_VIA_CMD\n"+
 "  System property, expands patterns beginning with the \"%\" character,\n"+
 "  and uses the resulting command line to establish the secure tunnel\n"+
@@ -359,7 +361,7 @@ public class VncViewer implements Runnable {
     JOptionPane op =
       new JOptionPane(msg, JOptionPane.INFORMATION_MESSAGE,
                       JOptionPane.DEFAULT_OPTION, VncViewer.logoIcon, options);
-    JDialog dlg = op.createDialog(parent, "About TigerVNC Viewer for Java");
+    JDialog dlg = op.createDialog(parent, "About TigerVNC viewer for Java");
     dlg.setIconImage(VncViewer.frameIcon);
     dlg.setAlwaysOnTop(true);
     dlg.setVisible(true);
@@ -378,7 +380,7 @@ public class VncViewer implements Runnable {
   void reportException(java.lang.Exception e) {
     String title, msg = e.getMessage();
     int msgType = JOptionPane.ERROR_MESSAGE;
-    title = "TigerVNC Viewer : Error";
+    title = "TigerVNC viewer : Error";
     e.printStackTrace();
     JOptionPane.showMessageDialog(null, msg, title, msgType);
   }
@@ -446,6 +448,15 @@ public class VncViewer implements Runnable {
           cc.close();
       }
       exit(1);
+    }
+  }
+
+  static void migrateDeprecatedOptions() {
+    if (dotWhenNoCursor.getValue()) {
+      vlog.info("DotWhenNoCursor is deprecated, set AlwaysCursor to 1 and CursorType to 'Dot' instead");
+
+      alwaysCursor.setParam(true);
+      cursorType.setParam("Dot");
     }
   }
 

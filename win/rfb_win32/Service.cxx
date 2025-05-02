@@ -42,49 +42,49 @@ static LogWriter vlog("Service");
 
 // - Internal service implementation functions
 
-Service* service = 0;
+Service* service = nullptr;
 bool runAsService = false;
 
 VOID WINAPI serviceHandler(DWORD control) {
   switch (control) {
   case SERVICE_CONTROL_INTERROGATE:
-    vlog.info("cmd: report status");
+    vlog.info("CMD: Report status");
     service->setStatus();
     return;
   case SERVICE_CONTROL_PARAMCHANGE:
-    vlog.info("cmd: param change");
+    vlog.info("CMD: Param change");
     service->readParams();
     return;
   case SERVICE_CONTROL_SHUTDOWN:
-    vlog.info("cmd: OS shutdown");
+    vlog.info("CMD: OS shutdown");
     service->osShuttingDown();
     return;
   case SERVICE_CONTROL_STOP:
-    vlog.info("cmd: stop");
+    vlog.info("CMD: Stop");
     service->setStatus(SERVICE_STOP_PENDING);
     service->stop();
     return;
   };
-  vlog.debug("cmd: unknown %lu", control);
+  vlog.debug("CMD: Unknown %lu", control);
 }
 
 
 // -=- Service main procedure
 
 VOID WINAPI serviceProc(DWORD dwArgc, LPTSTR* lpszArgv) {
-  vlog.debug("entering %s serviceProc", service->getName());
-  vlog.info("registering handler...");
+  vlog.debug("Entering %s serviceProc", service->getName());
+  vlog.info("Registering handler...");
   service->status_handle = RegisterServiceCtrlHandler(service->getName(), serviceHandler);
   if (!service->status_handle) {
     DWORD err = GetLastError();
-    vlog.error("failed to register handler: %lu", err);
+    vlog.error("Failed to register handler: %lu", err);
     ExitProcess(err);
   }
-  vlog.debug("registered handler (%p)", service->status_handle);
+  vlog.debug("Registered handler (%p)", service->status_handle);
   service->setStatus(SERVICE_START_PENDING);
-  vlog.debug("entering %s serviceMain", service->getName());
+  vlog.debug("Entering %s serviceMain", service->getName());
   service->status.dwWin32ExitCode = service->serviceMain(dwArgc, lpszArgv);
-  vlog.debug("leaving %s serviceMain", service->getName());
+  vlog.debug("Leaving %s serviceMain", service->getName());
   service->setStatus(SERVICE_STOPPED);
 }
 
@@ -93,7 +93,7 @@ VOID WINAPI serviceProc(DWORD dwArgc, LPTSTR* lpszArgv) {
 
 Service::Service(const char* name_) : name(name_) {
   vlog.debug("Service");
-  status_handle = 0;
+  status_handle = nullptr;
   status.dwControlsAccepted = SERVICE_CONTROL_INTERROGATE | SERVICE_ACCEPT_SHUTDOWN | SERVICE_ACCEPT_STOP;
   status.dwServiceType = SERVICE_WIN32_OWN_PROCESS | SERVICE_INTERACTIVE_PROCESS;
   status.dwWin32ExitCode = NO_ERROR;
@@ -108,14 +108,14 @@ Service::start() {
   SERVICE_TABLE_ENTRY entry[2];
   entry[0].lpServiceName = (char*)name;
   entry[0].lpServiceProc = serviceProc;
-  entry[1].lpServiceName = NULL;
-  entry[1].lpServiceProc = NULL;
-  vlog.debug("entering dispatcher");
+  entry[1].lpServiceName = nullptr;
+  entry[1].lpServiceProc = nullptr;
+  vlog.debug("Entering dispatcher");
   if (!SetProcessShutdownParameters(0x100, 0))
-    vlog.error("unable to set shutdown parameters: %lu", GetLastError());
+    vlog.error("Unable to set shutdown parameters: %lu", GetLastError());
   service = this;
   if (!StartServiceCtrlDispatcher(entry))
-    throw SystemException("unable to start service", GetLastError());
+    throw win32_error("Unable to start service", GetLastError());
 }
 
 void
@@ -125,8 +125,8 @@ Service::setStatus() {
 
 void
 Service::setStatus(DWORD state) {
-  if (status_handle == 0) {
-    vlog.debug("warning - cannot setStatus");
+  if (status_handle == nullptr) {
+    vlog.debug("Warning: Cannot setStatus");
     return;
   }
   status.dwCurrentState = state;
@@ -134,14 +134,14 @@ Service::setStatus(DWORD state) {
   if (!SetServiceStatus(status_handle, &status)) {
     status.dwCurrentState = SERVICE_STOPPED;
     status.dwWin32ExitCode = GetLastError();
-    vlog.error("unable to set service status:%lu", status.dwWin32ExitCode);
+    vlog.error("Unable to set service status:%lu", status.dwWin32ExitCode);
   }
-  vlog.debug("set status to %lu(%lu)", state, status.dwCheckPoint);
+  vlog.debug("Set status to %lu(%lu)", state, status.dwCheckPoint);
 }
 
 Service::~Service() {
   vlog.debug("~Service");
-  service = 0;
+  service = nullptr;
 }
 
 
@@ -162,7 +162,7 @@ switchToDesktop(HDESK desktop) {
     return false;
   }
   if (!CloseDesktop(old_desktop))
-    vlog.debug("unable to close old desktop:%lu", GetLastError());
+    vlog.debug("Unable to close old desktop:%lu", GetLastError());
   return true;
 }
 
@@ -176,7 +176,7 @@ inputDesktopSelected() {
 		DESKTOP_WRITEOBJECTS | DESKTOP_READOBJECTS |
 		DESKTOP_SWITCHDESKTOP | GENERIC_WRITE);
   if (!input) {
-    vlog.debug("unable to OpenInputDesktop(1):%lu", GetLastError());
+    vlog.debug("Unable to OpenInputDesktop(1):%lu", GetLastError());
     return false;
   }
 
@@ -185,17 +185,17 @@ inputDesktopSelected() {
   char inputname[256];
 
   if (!GetUserObjectInformation(current, UOI_NAME, currentname, 256, &size)) {
-    vlog.debug("unable to GetUserObjectInformation(1):%lu", GetLastError());
+    vlog.debug("Unable to GetUserObjectInformation(1):%lu", GetLastError());
     CloseDesktop(input);
     return false;
   }
   if (!GetUserObjectInformation(input, UOI_NAME, inputname, 256, &size)) {
-    vlog.debug("unable to GetUserObjectInformation(2):%lu", GetLastError());
+    vlog.debug("Unable to GetUserObjectInformation(2):%lu", GetLastError());
     CloseDesktop(input);
     return false;
   }
   if (!CloseDesktop(input))
-    vlog.debug("unable to close input desktop:%lu", GetLastError());
+    vlog.debug("Unable to close input desktop:%lu", GetLastError());
 
   // *** vlog.debug("current=%s, input=%s", currentname, inputname);
   bool result = strcmp(currentname, inputname) == 0;
@@ -212,7 +212,7 @@ selectInputDesktop() {
 		DESKTOP_WRITEOBJECTS | DESKTOP_READOBJECTS |
 		DESKTOP_SWITCHDESKTOP | GENERIC_WRITE);
   if (!desktop) {
-    vlog.debug("unable to OpenInputDesktop(2):%lu", GetLastError());
+    vlog.debug("Unable to OpenInputDesktop(2):%lu", GetLastError());
     return false;
   }
 
@@ -226,11 +226,11 @@ selectInputDesktop() {
   DWORD size = 256;
   char currentname[256];
   if (GetUserObjectInformation(desktop, UOI_NAME, currentname, 256, &size)) {
-    vlog.debug("switched to %s", currentname);
+    vlog.debug("Switched to %s", currentname);
   }
   // ***
 
-  vlog.debug("switched to input desktop");
+  vlog.debug("Switched to input desktop");
 
   return true;
 }
@@ -254,7 +254,7 @@ rfb::win32::changeDesktop() {
 bool
 rfb::win32::emulateCtrlAltDel() {
   rfb::win32::Handle sessionEventCad = 
-    CreateEvent(0, FALSE, FALSE, "Global\\SessionEventTigerVNCCad");
+    CreateEvent(nullptr, FALSE, FALSE, "Global\\SessionEventTigerVNCCad");
   SetEvent(sessionEventCad);
   return true;
 }
@@ -265,7 +265,7 @@ rfb::win32::emulateCtrlAltDel() {
 class Logger_EventLog : public Logger {
 public:
   Logger_EventLog(const char* srcname) : Logger("EventLog") {
-    eventlog = RegisterEventSource(NULL, srcname);
+    eventlog = RegisterEventSource(nullptr, srcname);
     if (!eventlog)
       printf("Unable to open event log:%ld\n", GetLastError());
   }
@@ -274,12 +274,12 @@ public:
       DeregisterEventSource(eventlog);
   }
 
-  virtual void write(int level, const char *logname, const char *message) {
+  void write(int level, const char *logname, const char *message) override {
     if (!eventlog) return;
     const char* strings[] = {logname, message};
     WORD type = EVENTLOG_INFORMATION_TYPE;
     if (level == 0) type = EVENTLOG_ERROR_TYPE;
-    if (!ReportEvent(eventlog, type, 0, VNC4LogMessage, NULL, 2, 0, strings, NULL)) {
+    if (!ReportEvent(eventlog, type, 0, VNC4LogMessage, nullptr, 2, 0, strings, nullptr)) {
       // *** It's not at all clear what is the correct behaviour if this fails...
       printf("ReportEvent failed:%ld\n", GetLastError());
     }
@@ -289,7 +289,7 @@ protected:
   HANDLE eventlog;
 };
 
-static Logger_EventLog* logger = 0;
+static Logger_EventLog* logger = nullptr;
 
 bool rfb::win32::initEventLogLogger(const char* srcname) {
   if (logger)
@@ -333,22 +333,22 @@ bool rfb::win32::registerService(const char* name,
   // - Register the service
 
   // - Open the SCM
-  ServiceHandle scm = OpenSCManager(NULL, NULL, SC_MANAGER_CREATE_SERVICE);
+  ServiceHandle scm = OpenSCManager(nullptr, nullptr, SC_MANAGER_CREATE_SERVICE);
   if (!scm)
-    throw rdr::SystemException("unable to open Service Control Manager", GetLastError());
+    throw rdr::win32_error("Unable to open Service Control Manager", GetLastError());
 
   // - Add the service
-  ServiceHandle service = CreateService(scm,
+  ServiceHandle handle = CreateService(scm,
     name, display, SC_MANAGER_ALL_ACCESS,
     SERVICE_WIN32_OWN_PROCESS | SERVICE_INTERACTIVE_PROCESS,
     SERVICE_AUTO_START, SERVICE_ERROR_IGNORE,
-    cmdline.c_str(), NULL, NULL, NULL, NULL, NULL);
-  if (!service)
-    throw rdr::SystemException("unable to create service", GetLastError());
+    cmdline.c_str(), nullptr, nullptr, nullptr, nullptr, nullptr);
+  if (!handle)
+    throw rdr::win32_error("Unable to create service", GetLastError());
 
   // - Set a description
   SERVICE_DESCRIPTION sdesc = {(LPTSTR)desc};
-  ChangeServiceConfig2(service, SERVICE_CONFIG_DESCRIPTION, &sdesc);
+  ChangeServiceConfig2(handle, SERVICE_CONFIG_DESCRIPTION, &sdesc);
 
   // - Register the event log source
   RegKey hk, hk2;
@@ -378,16 +378,16 @@ bool rfb::win32::registerService(const char* name,
 
 bool rfb::win32::unregisterService(const char* name) {
   // - Open the SCM
-  ServiceHandle scm = OpenSCManager(NULL, NULL, SC_MANAGER_CREATE_SERVICE);
+  ServiceHandle scm = OpenSCManager(nullptr, nullptr, SC_MANAGER_CREATE_SERVICE);
   if (!scm)
-    throw rdr::SystemException("unable to open Service Control Manager", GetLastError());
+    throw rdr::win32_error("Unable to open Service Control Manager", GetLastError());
 
   // - Create the service
-  ServiceHandle service = OpenService(scm, name, SC_MANAGER_ALL_ACCESS);
-  if (!service)
-    throw rdr::SystemException("unable to locate the service", GetLastError());
-  if (!DeleteService(service))
-    throw rdr::SystemException("unable to remove the service", GetLastError());
+  ServiceHandle handle = OpenService(scm, name, SC_MANAGER_ALL_ACCESS);
+  if (!handle)
+    throw rdr::win32_error("Unable to locate the service", GetLastError());
+  if (!DeleteService(handle))
+    throw rdr::win32_error("Unable to remove the service", GetLastError());
 
   // - Register the event log source
   RegKey hk;
@@ -405,18 +405,18 @@ bool rfb::win32::unregisterService(const char* name) {
 bool rfb::win32::startService(const char* name) {
 
   // - Open the SCM
-  ServiceHandle scm = OpenSCManager(NULL, NULL, SC_MANAGER_CONNECT);
+  ServiceHandle scm = OpenSCManager(nullptr, nullptr, SC_MANAGER_CONNECT);
   if (!scm)
-    throw rdr::SystemException("unable to open Service Control Manager", GetLastError());
+    throw rdr::win32_error("Unable to open Service Control Manager", GetLastError());
 
   // - Locate the service
-  ServiceHandle service = OpenService(scm, name, SERVICE_START);
-  if (!service)
-    throw rdr::SystemException("unable to open the service", GetLastError());
+  ServiceHandle handle = OpenService(scm, name, SERVICE_START);
+  if (!handle)
+    throw rdr::win32_error("Unable to open the service", GetLastError());
 
   // - Start the service
-  if (!StartService(service, 0, NULL))
-    throw rdr::SystemException("unable to start the service", GetLastError());
+  if (!StartService(handle, 0, nullptr))
+    throw rdr::win32_error("Unable to start the service", GetLastError());
 
   Sleep(500);
 
@@ -425,19 +425,19 @@ bool rfb::win32::startService(const char* name) {
 
 bool rfb::win32::stopService(const char* name) {
   // - Open the SCM
-  ServiceHandle scm = OpenSCManager(NULL, NULL, SC_MANAGER_CONNECT);
+  ServiceHandle scm = OpenSCManager(nullptr, nullptr, SC_MANAGER_CONNECT);
   if (!scm)
-    throw rdr::SystemException("unable to open Service Control Manager", GetLastError());
+    throw rdr::win32_error("Unable to open Service Control Manager", GetLastError());
 
   // - Locate the service
-  ServiceHandle service = OpenService(scm, name, SERVICE_STOP);
-  if (!service)
-    throw rdr::SystemException("unable to open the service", GetLastError());
+  ServiceHandle handle = OpenService(scm, name, SERVICE_STOP);
+  if (!handle)
+    throw rdr::win32_error("Unable to open the service", GetLastError());
 
   // - Start the service
   SERVICE_STATUS status;
-  if (!ControlService(service, SERVICE_CONTROL_STOP, &status))
-    throw rdr::SystemException("unable to stop the service", GetLastError());
+  if (!ControlService(handle, SERVICE_CONTROL_STOP, &status))
+    throw rdr::win32_error("Unable to stop the service", GetLastError());
 
   Sleep(500);
 
@@ -446,19 +446,19 @@ bool rfb::win32::stopService(const char* name) {
 
 DWORD rfb::win32::getServiceState(const char* name) {
   // - Open the SCM
-  ServiceHandle scm = OpenSCManager(NULL, NULL, SC_MANAGER_CONNECT);
+  ServiceHandle scm = OpenSCManager(nullptr, nullptr, SC_MANAGER_CONNECT);
   if (!scm)
-    throw rdr::SystemException("unable to open Service Control Manager", GetLastError());
+    throw rdr::win32_error("Unable to open Service Control Manager", GetLastError());
 
   // - Locate the service
-  ServiceHandle service = OpenService(scm, name, SERVICE_INTERROGATE);
-  if (!service)
-    throw rdr::SystemException("unable to open the service", GetLastError());
+  ServiceHandle handle = OpenService(scm, name, SERVICE_INTERROGATE);
+  if (!handle)
+    throw rdr::win32_error("Unable to open the service", GetLastError());
 
   // - Get the service status
   SERVICE_STATUS status;
-  if (!ControlService(service, SERVICE_CONTROL_INTERROGATE, (SERVICE_STATUS*)&status))
-    throw rdr::SystemException("unable to query the service", GetLastError());
+  if (!ControlService(handle, SERVICE_CONTROL_INTERROGATE, (SERVICE_STATUS*)&status))
+    throw rdr::win32_error("Unable to query the service", GetLastError());
 
   return status.dwCurrentState;
 }

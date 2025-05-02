@@ -28,19 +28,24 @@
 
 #include <rfb/CSecurity.h>
 #include <rfb/Security.h>
-#include <rfb/UserMsgBox.h>
-#include <rdr/InStream.h>
-#include <rdr/OutStream.h>
+
 #include <gnutls/gnutls.h>
+
+namespace rdr {
+  class InStream;
+  class OutStream;
+  class TLSInStream;
+  class TLSOutStream;
+}
 
 namespace rfb {
   class CSecurityTLS : public CSecurity {
   public:
     CSecurityTLS(CConnection* cc, bool _anon);
     virtual ~CSecurityTLS();
-    virtual bool processMsg();
-    virtual int getType() const { return anon ? secTypeTLSNone : secTypeX509None; }
-    virtual bool isSecure() const { return !anon; }
+    bool processMsg() override;
+    int getType() const override { return anon ? secTypeTLSNone : secTypeX509None; }
+    bool isSecure() const override { return !anon; }
 
     static StringParameter X509CA;
     static StringParameter X509CRL;
@@ -58,8 +63,8 @@ namespace rfb {
     gnutls_certificate_credentials_t cert_cred;
     bool anon;
 
-    rdr::InStream* tlsis;
-    rdr::OutStream* tlsos;
+    rdr::TLSInStream* tlsis;
+    rdr::TLSOutStream* tlsos;
 
     rdr::InStream* rawis;
     rdr::OutStream* rawos;

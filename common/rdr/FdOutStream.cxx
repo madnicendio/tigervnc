@@ -59,7 +59,7 @@ FdOutStream::FdOutStream(int fd_)
 #endif
   fd(fd_)
 {
-  gettimeofday(&lastWrite, NULL);
+  gettimeofday(&lastWrite, nullptr);
 }
 
 FdOutStream::~FdOutStream()
@@ -113,11 +113,11 @@ size_t FdOutStream::writeFd(const uint8_t* data, size_t length)
 
     FD_ZERO(&fds);
     FD_SET(fd, &fds);
-    n = select(fd+1, 0, &fds, 0, &tv);
+    n = select(fd+1, nullptr, &fds, nullptr, &tv);
   } while (n < 0 && errorNumber == EINTR);
 
   if (n < 0)
-    throw SystemException("select", errorNumber);
+    throw socket_error("select", errorNumber);
 
   if (n == 0)
     return 0;
@@ -134,9 +134,9 @@ size_t FdOutStream::writeFd(const uint8_t* data, size_t length)
   } while (n < 0 && (errorNumber == EINTR));
 
   if (n < 0)
-    throw SystemException("write", errorNumber);
+    throw socket_error("write", errorNumber);
 
-  gettimeofday(&lastWrite, NULL);
+  gettimeofday(&lastWrite, nullptr);
 
   return n;
 }

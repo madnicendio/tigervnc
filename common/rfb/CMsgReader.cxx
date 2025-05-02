@@ -119,7 +119,7 @@ bool CMsgReader::readMsg()
       ret = readEndOfContinuousUpdates();
       break;
     default:
-      throw Exception("Unknown message type %d", currentMsgType);
+      throw protocol_error(format("Unknown message type %d", currentMsgType));
     }
 
     if (ret)
@@ -202,6 +202,10 @@ bool CMsgReader::readMsg()
       handler->supportsQEMUKeyEvent();
       ret = true;
       break;
+    case pseudoEncodingExtendedMouseButtons:
+      handler->supportsExtendedMouseButtons();
+      ret = true;
+      break;
     default:
       ret = readRect(dataRect, rectEncoding);
       break;
@@ -277,7 +281,7 @@ bool CMsgReader::readServerCutText()
 
   if (len > (size_t)maxCutText) {
     is->skip(len);
-    vlog.error("cut text too long (%d bytes) - ignoring",len);
+    vlog.error("Cut text too long (%d bytes) - ignoring",len);
     return true;
   }
 
@@ -301,7 +305,7 @@ bool CMsgReader::readExtendedClipboard(int32_t len)
     return false;
 
   if (len < 4)
-    throw Exception("Invalid extended clipboard message");
+    throw protocol_error("Invalid extended clipboard message");
   if (len > maxCutText) {
     vlog.error("Extended clipboard message too long (%d bytes) - ignoring", len);
     is->skip(len);
@@ -323,7 +327,7 @@ bool CMsgReader::readExtendedClipboard(int32_t len)
     }
 
     if (len < (int32_t)(4 + 4*num))
-      throw Exception("Invalid extended clipboard message");
+      throw protocol_error("Invalid extended clipboard message");
 
     num = 0;
     for (i = 0;i < 16;i++) {
@@ -348,7 +352,7 @@ bool CMsgReader::readExtendedClipboard(int32_t len)
         continue;
 
       if (!zis.hasData(4))
-        throw Exception("Extended clipboard decode error");
+        throw protocol_error("Extended clipboard decode error");
 
       lengths[num] = zis.readU32();
 
@@ -361,7 +365,7 @@ bool CMsgReader::readExtendedClipboard(int32_t len)
           size_t chunk;
 
           if (!zis.hasData(1))
-            throw Exception("Extended clipboard decode error");
+            throw protocol_error("Extended clipboard decode error");
 
           chunk = zis.avail();
           if (chunk > lengths[num])
@@ -377,7 +381,7 @@ bool CMsgReader::readExtendedClipboard(int32_t len)
       }
 
       if (!zis.hasData(lengths[num]))
-        throw Exception("Extended clipboard decode error");
+        throw protocol_error("Extended clipboard decode error");
 
       buffers[num] = new uint8_t[lengths[num]];
       zis.readBytes(buffers[num], lengths[num]);
@@ -385,7 +389,7 @@ bool CMsgReader::readExtendedClipboard(int32_t len)
     }
 
     zis.flushUnderlying();
-    zis.setUnderlying(NULL, 0);
+    zis.setUnderlying(nullptr, 0);
 
     handler->handleClipboardProvide(flags, lengths, buffers);
 
@@ -407,7 +411,7 @@ bool CMsgReader::readExtendedClipboard(int32_t len)
       handler->handleClipboardNotify(flags);
       break;
     default:
-      throw Exception("Invalid extended clipboard action");
+      throw protocol_error("Invalid extended clipboard action");
     }
   }
 
@@ -473,11 +477,11 @@ bool CMsgReader::readRect(const Rect& r, int encoding)
     vlog.error("Rect too big: %dx%d at %d,%d exceeds %dx%d",
 	    r.width(), r.height(), r.tl.x, r.tl.y,
             handler->server.width(), handler->server.height());
-    throw Exception("Rect too big");
+    throw protocol_error("Rect too big");
   }
 
   if (r.is_empty())
-    vlog.error("zero size rect");
+    vlog.error("Zero size rect");
 
   return handler->dataRect(r, encoding);
 }
@@ -485,7 +489,7 @@ bool CMsgReader::readRect(const Rect& r, int encoding)
 bool CMsgReader::readSetXCursor(int width, int height, const Point& hotspot)
 {
   if (width > maxCursorSize || height > maxCursorSize)
-    throw Exception("Too big cursor");
+    throw protocol_error("Too big cursor");
 
   std::vector<uint8_t> rgba(width*height*4);
 
@@ -549,7 +553,7 @@ bool CMsgReader::readSetXCursor(int width, int height, const Point& hotspot)
 bool CMsgReader::readSetCursor(int width, int height, const Point& hotspot)
 {
   if (width > maxCursorSize || height > maxCursorSize)
-    throw Exception("Too big cursor");
+    throw protocol_error("Too big cursor");
 
   int data_len = width * height * (handler->server.pf().bpp/8);
   int mask_len = ((width+7)/8) * height;
@@ -595,7 +599,7 @@ bool CMsgReader::readSetCursor(int width, int height, const Point& hotspot)
 bool CMsgReader::readSetCursorWithAlpha(int width, int height, const Point& hotspot)
 {
   if (width > maxCursorSize || height > maxCursorSize)
-    throw Exception("Too big cursor");
+    throw protocol_error("Too big cursor");
 
   const PixelFormat rgbaPF(32, 32, false, true, 255, 255, 255, 16, 8, 0);
   ManagedPixelBuffer pb(rgbaPF, width, height);
@@ -656,7 +660,7 @@ bool CMsgReader::readSetCursorWithAlpha(int width, int height, const Point& hots
 bool CMsgReader::readSetVMwareCursor(int width, int height, const Point& hotspot)
 {
   if (width > maxCursorSize || height > maxCursorSize)
-    throw Exception("Too big cursor");
+    throw protocol_error("Too big cursor");
 
   uint8_t type;
 
@@ -750,7 +754,7 @@ bool CMsgReader::readSetVMwareCursor(int width, int height, const Point& hotspot
 
     handler->setCursor(width, height, hotspot, data.data());
   } else {
-    throw Exception("Unknown cursor type");
+    throw protocol_error("Unknown cursor type");
   }
 
   return true;
@@ -827,31 +831,31 @@ bool CMsgReader::readExtendedDesktopSize(int x, int y, int w, int h)
 
 bool CMsgReader::readLEDState()
 {
-  uint8_t state;
+  uint8_t ledState;
 
   if (!is->hasData(1))
     return false;
 
-  state = is->readU8();
+  ledState = is->readU8();
 
-  handler->setLEDState(state);
+  handler->setLEDState(ledState);
 
   return true;
 }
 
 bool CMsgReader::readVMwareLEDState()
 {
-  uint32_t state;
+  uint32_t ledState;
 
   if (!is->hasData(4))
     return false;
 
-  state = is->readU32();
+  ledState = is->readU32();
 
   // As luck has it, this extension uses the same bit definitions,
   // so no conversion required
 
-  handler->setLEDState(state);
+  handler->setLEDState(ledState);
 
   return true;
 }

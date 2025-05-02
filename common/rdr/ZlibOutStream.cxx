@@ -24,7 +24,6 @@
 #include <stdio.h>
 
 #include <rdr/ZlibOutStream.h>
-#include <rdr/Exception.h>
 #include <rfb/LogWriter.h>
 
 #include <zlib.h>
@@ -39,14 +38,14 @@ ZlibOutStream::ZlibOutStream(OutStream* os, int compressLevel)
   : underlying(os), compressionLevel(compressLevel), newLevel(compressLevel)
 {
   zs = new z_stream;
-  zs->zalloc    = Z_NULL;
-  zs->zfree     = Z_NULL;
-  zs->opaque    = Z_NULL;
-  zs->next_in   = Z_NULL;
+  zs->zalloc    = nullptr;
+  zs->zfree     = nullptr;
+  zs->opaque    = nullptr;
+  zs->next_in   = nullptr;
   zs->avail_in  = 0;
   if (deflateInit(zs, compressLevel) != Z_OK) {
     delete zs;
-    throw Exception("ZlibOutStream: deflateInit failed");
+    throw std::runtime_error("ZlibOutStream: deflateInit failed");
   }
 }
 
@@ -54,7 +53,7 @@ ZlibOutStream::~ZlibOutStream()
 {
   try {
     flush();
-  } catch (Exception&) {
+  } catch (std::exception&) {
   }
   deflateEnd(zs);
   delete zs;
@@ -78,14 +77,14 @@ void ZlibOutStream::setCompressionLevel(int level)
 void ZlibOutStream::flush()
 {
   BufferedOutStream::flush();
-  if (underlying != NULL)
+  if (underlying != nullptr)
     underlying->flush();
 }
 
 void ZlibOutStream::cork(bool enable)
 {
   BufferedOutStream::cork(enable);
-  if (underlying != NULL)
+  if (underlying != nullptr)
     underlying->cork(enable);
 }
 
@@ -97,7 +96,7 @@ bool ZlibOutStream::flushBuffer()
   zs->avail_in = ptr - sentUpTo;
 
 #ifdef ZLIBOUT_DEBUG
-  vlog.debug("flush: avail_in %d",zs->avail_in);
+  vlog.debug("Flush: avail_in %d",zs->avail_in);
 #endif
 
   // Force out everything from the zlib encoder
@@ -113,7 +112,7 @@ void ZlibOutStream::deflate(int flush)
   int rc;
 
   if (!underlying)
-    throw Exception("ZlibOutStream: underlying OutStream has not been set");
+    throw std::runtime_error("ZlibOutStream: Underlying OutStream has not been set");
 
   if ((flush == Z_NO_FLUSH) && (zs->avail_in == 0))
     return;
@@ -124,7 +123,7 @@ void ZlibOutStream::deflate(int flush)
     zs->avail_out = chunk = underlying->avail();
 
 #ifdef ZLIBOUT_DEBUG
-    vlog.debug("calling deflate, avail_in %d, avail_out %d",
+    vlog.debug("Calling deflate, avail_in %d, avail_out %d",
                zs->avail_in,zs->avail_out);
 #endif
 
@@ -134,11 +133,11 @@ void ZlibOutStream::deflate(int flush)
       if ((rc == Z_BUF_ERROR) && (flush != Z_NO_FLUSH))
         break;
 
-      throw Exception("ZlibOutStream: deflate failed");
+      throw std::runtime_error("ZlibOutStream: deflate failed");
     }
 
 #ifdef ZLIBOUT_DEBUG
-    vlog.debug("after deflate: %d bytes",
+    vlog.debug("After deflate: %d bytes",
                zs->next_out-underlying->getptr());
 #endif
 
@@ -152,7 +151,7 @@ void ZlibOutStream::checkCompressionLevel()
 
   if (newLevel != compressionLevel) {
 #ifdef ZLIBOUT_DEBUG
-    vlog.debug("change: avail_in %d",zs->avail_in);
+    vlog.debug("Change: avail_in %d",zs->avail_in);
 #endif
 
     // zlib is just horribly stupid. It does an implicit flush on
@@ -168,7 +167,7 @@ void ZlibOutStream::checkCompressionLevel()
       // explicit flush we did above. It should be safe to ignore though
       // as the first flush should have left things in a stable state...
       if (rc != Z_BUF_ERROR)
-        throw Exception("ZlibOutStream: deflateParams failed");
+        throw std::runtime_error("ZlibOutStream: deflateParams failed");
     }
 
     compressionLevel = newLevel;

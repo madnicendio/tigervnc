@@ -44,10 +44,10 @@ static void fillMonitorInfo(HMONITOR monitor, MONITORINFOEXA* mi) {
   memset(mi, 0, sizeof(MONITORINFOEXA));
   mi->cbSize = sizeof(MONITORINFOEXA);
   if (!GetMonitorInfo(monitor, mi))
-    throw rdr::SystemException("failed to GetMonitorInfo", GetLastError());
-  vlog.debug("monitor is %ld,%ld-%ld,%ld", mi->rcMonitor.left, mi->rcMonitor.top, mi->rcMonitor.right, mi->rcMonitor.bottom);
-  vlog.debug("work area is %ld,%ld-%ld,%ld", mi->rcWork.left, mi->rcWork.top, mi->rcWork.right, mi->rcWork.bottom);
-  vlog.debug("device is \"%s\"", mi->szDevice);
+    throw rdr::win32_error("Failed to GetMonitorInfo", GetLastError());
+  vlog.debug("Monitor is %ld,%ld-%ld,%ld", mi->rcMonitor.left, mi->rcMonitor.top, mi->rcMonitor.right, mi->rcMonitor.bottom);
+  vlog.debug("Work area is %ld,%ld-%ld,%ld", mi->rcWork.left, mi->rcWork.top, mi->rcWork.right, mi->rcWork.bottom);
+  vlog.debug("Device is \"%s\"", mi->szDevice);
 }
 
 
@@ -57,7 +57,7 @@ MonitorInfo::MonitorInfo(HWND window) {
 
   HMONITOR monitor = MonitorFromWindow(window, MONITOR_DEFAULTTONEAREST);
   if (!monitor)
-    throw rdr::SystemException("failed to get monitor", GetLastError());
+    throw rdr::win32_error("Failed to get monitor", GetLastError());
   fillMonitorInfo(monitor, this);
 }
 
@@ -67,7 +67,7 @@ MonitorInfo::MonitorInfo(const RECT& r) {
 
   HMONITOR monitor = MonitorFromRect(&r, MONITOR_DEFAULTTONEAREST);
   if (!monitor)
-    throw rdr::SystemException("failed to get monitor", GetLastError());
+    throw rdr::win32_error("Failed to get monitor", GetLastError());
   fillMonitorInfo(monitor, this);
 }
 
@@ -96,7 +96,7 @@ MonitorInfo::MonitorInfo(const char* devName) {
   monitorByNameData data;
   data.info = this;
   data.monitorName = devName;
-  EnumDisplayMonitors(0, 0, &monitorByNameEnumProc, (LPARAM)&data);
+  EnumDisplayMonitors(nullptr, nullptr, &monitorByNameEnumProc, (LPARAM)&data);
 }
 
 void MonitorInfo::moveTo(HWND handle) {
@@ -134,7 +134,7 @@ void MonitorInfo::clipTo(HWND handle) {
   RECT r;
   GetWindowRect(handle, &r);
   clipTo(&r);
-  SetWindowPos(handle, 0, r.left, r.top, r.right-r.left, r.bottom-r.top,
+  SetWindowPos(handle, nullptr, r.left, r.top, r.right-r.left, r.bottom-r.top,
                SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOOWNERZORDER);
 }
 

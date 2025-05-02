@@ -26,30 +26,24 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <os/Mutex.h>
-
 #include <rfb/Logger_file.h>
 
 using namespace rfb;
 
 Logger_File::Logger_File(const char* loggerName)
-  : Logger(loggerName), indent(13), width(79), m_file(0),
+  : Logger(loggerName), indent(13), width(79), m_file(nullptr),
     m_lastLogTime(0)
 {
   m_filename[0] = '\0';
-  mutex = new os::Mutex();
 }
 
 Logger_File::~Logger_File()
 {
   closeFile();
-  delete mutex;
 }
 
 void Logger_File::write(int /*level*/, const char *logname, const char *message)
 {
-  os::AutoMutex a(mutex);
-
   if (!m_file) {
     if (m_filename[0] == '\0')
       return;
@@ -65,7 +59,7 @@ void Logger_File::write(int /*level*/, const char *logname, const char *message)
     if (!m_file) return;
   }
 
-  time_t current = time(0);
+  time_t current = time(nullptr);
   if (current != m_lastLogTime) {
     m_lastLogTime = current;
     fprintf(m_file, "\n%s", ctime(&m_lastLogTime));
@@ -100,7 +94,7 @@ void Logger_File::setFilename(const char* filename)
 {
   closeFile();
   m_filename[0] = '\0';
-  if (strlen(filename) >= sizeof(filename))
+  if (strlen(filename) >= sizeof(m_filename))
     return;
   strcpy(m_filename, filename);
 }
@@ -115,7 +109,7 @@ void Logger_File::closeFile()
 {
   if (m_file) {
     fclose(m_file);
-    m_file = 0;
+    m_file = nullptr;
   }
 }
 

@@ -31,7 +31,7 @@ static LogWriter vlog("ManagedListener");
 
 
 ManagedListener::ManagedListener(SocketManager* mgr)
-: filter(0), manager(mgr), addrChangeNotifier(0), server(0), port(0), localOnly(false) {
+: filter(nullptr), manager(mgr), addrChangeNotifier(nullptr), server(nullptr), port(0), localOnly(false) {
 }
 
 ManagedListener::~ManagedListener() {
@@ -45,10 +45,10 @@ ManagedListener::~ManagedListener() {
 }
 
 
-void ManagedListener::setServer(network::SocketServer* svr) {
+void ManagedListener::setServer(rfb::VNCServer* svr) {
   if (svr == server)
     return;
-  vlog.info("set server to %p", svr);
+  vlog.info("Set server to %p", svr);
   server = svr;
   refresh();
 }
@@ -56,14 +56,14 @@ void ManagedListener::setServer(network::SocketServer* svr) {
 void ManagedListener::setPort(int port_, bool localOnly_) {
   if ((port_ == port) && (localOnly == localOnly_))
     return;
-  vlog.info("set port to %d", port_);
+  vlog.info("Set port to %d", port_);
   port = port_;
   localOnly = localOnly_;
   refresh();
 }
 
 void ManagedListener::setFilter(const char* filterStr) {
-  vlog.info("set filter to %s", filterStr);
+  vlog.info("Set filter to %s", filterStr);
   delete filter;
   filter = new network::TcpFilter(filterStr);
   if (!sockets.empty() && !localOnly) {
@@ -98,10 +98,10 @@ void ManagedListener::refresh() {
       if (localOnly)
         network::createLocalTcpListeners(&sockets, port);
       else
-        network::createTcpListeners(&sockets, NULL, port);
+        network::createTcpListeners(&sockets, nullptr, port);
     }
-  } catch (rdr::Exception& e) {
-    vlog.error("%s", e.str());
+  } catch (std::exception& e) {
+    vlog.error("%s", e.what());
   }
   if (!sockets.empty()) {
     if (!localOnly) {

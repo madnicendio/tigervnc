@@ -36,7 +36,7 @@
 #include "XorgGlue.h"
 #include "RandrGlue.h"
 
-static void vncModuleInit(INITARGS);
+static void vncModuleInit(void);
 
 static MODULESETUPPROTO(vncSetup);
 
@@ -50,10 +50,10 @@ ExtensionModule vncExt =
 static XF86ModuleVersionInfo vncVersRec =
 {
     "vnc",
-    "TigerVNC Project",
+    "TigerVNC project",
     MODINFOSTRING1,
     MODINFOSTRING2,
-    XORG_VERSION_CURRENT,
+    VENDOR_RELEASE,
     1, 0, 0,
     ABI_CLASS_EXTENSION,         /* needs the server extension ABI */
     ABI_EXTENSION_VERSION,
@@ -70,7 +70,7 @@ vncSetup(void * module, void * opts, int *errmaj, int *errmin) {
     return (void *)1;
 }
 
-static void vncModuleInit(INITARGS)
+static void vncModuleInit(void)
 {
   static char once = 0;
 

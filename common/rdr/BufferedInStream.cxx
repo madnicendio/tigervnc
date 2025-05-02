@@ -24,7 +24,8 @@
 #include <assert.h>
 
 #include <rdr/BufferedInStream.h>
-#include <rdr/Exception.h>
+
+#include <rfb/util.h>
 
 using namespace rdr;
 
@@ -35,7 +36,7 @@ BufferedInStream::BufferedInStream()
   : bufSize(DEFAULT_BUF_SIZE), offset(0)
 {
   ptr = end = start = new uint8_t[bufSize];
-  gettimeofday(&lastSizeCheck, NULL);
+  gettimeofday(&lastSizeCheck, nullptr);
   peakUsage = 0;
 }
 
@@ -63,9 +64,12 @@ void BufferedInStream::ensureSpace(size_t needed)
     uint8_t* newBuffer;
 
     if (needed > MAX_BUF_SIZE)
-      throw Exception("BufferedInStream overrun: requested size of "
-                      "%lu bytes exceeds maximum of %lu bytes",
-                      (long unsigned)needed, (long unsigned)MAX_BUF_SIZE);
+      throw std::out_of_range(rfb::format("BufferedInStream overrun: "
+                                          "requested size of %lu bytes "
+                                          "exceeds maximum of %lu "
+                                          "bytes",
+                                          (long unsigned)needed,
+                                          (long unsigned)MAX_BUF_SIZE));
 
     newSize = DEFAULT_BUF_SIZE;
     while (newSize < needed)
@@ -80,7 +84,7 @@ void BufferedInStream::ensureSpace(size_t needed)
     end = newBuffer + (end - ptr);
     ptr = start = newBuffer;
 
-    gettimeofday(&lastSizeCheck, NULL);
+    gettimeofday(&lastSizeCheck, nullptr);
     peakUsage = needed;
   }
 
@@ -88,7 +92,7 @@ void BufferedInStream::ensureSpace(size_t needed)
     peakUsage = needed;
 
   // Time to shrink an excessive buffer?
-  gettimeofday(&now, NULL);
+  gettimeofday(&now, nullptr);
   if ((avail() == 0) && (bufSize > DEFAULT_BUF_SIZE) &&
       ((now.tv_sec < lastSizeCheck.tv_sec) ||
        (now.tv_sec > (lastSizeCheck.tv_sec + 5)))) {
@@ -105,7 +109,7 @@ void BufferedInStream::ensureSpace(size_t needed)
       bufSize = newSize;
     }
 
-    gettimeofday(&lastSizeCheck, NULL);
+    gettimeofday(&lastSizeCheck, nullptr);
     peakUsage = needed;
   }
 

@@ -44,21 +44,21 @@ FileVersionInfo::FileVersionInfo(const char* filename) {
   // Attempt to open the file, to cause Access Denied, etc, errors
   // to be correctly reported, since the GetFileVersionInfoXXX calls lie...
   {
-    Handle file(CreateFile(filename, GENERIC_READ, FILE_SHARE_READ, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0));
+    Handle file(CreateFile(filename, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
 	  if (file.h == INVALID_HANDLE_VALUE)
-      throw rdr::SystemException("Failed to open file", GetLastError());
+      throw rdr::win32_error("Failed to open file", GetLastError());
   }
 
   // Get version info size
   DWORD handle;
   int size = GetFileVersionInfoSize((char*)filename, &handle);
   if (!size)
-    throw rdr::SystemException("GetVersionInfoSize failed", GetLastError());
+    throw rdr::win32_error("GetVersionInfoSize failed", GetLastError());
 
   // Get version info
   buf = new char[size];
   if (!GetFileVersionInfo((char*)filename, handle, size, buf))
-    throw rdr::SystemException("GetVersionInfo failed", GetLastError());
+    throw rdr::win32_error("GetVersionInfo failed", GetLastError());
 }
 
 FileVersionInfo::~FileVersionInfo() {
@@ -77,11 +77,11 @@ const char* FileVersionInfo::getVerString(const char* name, DWORD langId) {
   infoName = format("\\StringFileInfo\\%s\\%s", langIdStr.c_str(), name);
 
   // Locate the required version string within the version info
-  char* buffer = 0;
+  char* buffer = nullptr;
   UINT length = 0;
   if (!VerQueryValue(buf, infoName.c_str(), (void**)&buffer, &length)) {
     printf("unable to find %s version string", infoName.c_str());
-    throw rdr::Exception("VerQueryValue failed");
+    throw std::runtime_error("VerQueryValue failed");
   }
   return buffer;
 }
@@ -104,13 +104,13 @@ void centerWindow(HWND handle, const RECT& r) {
   int x = (r.left + r.right - w)/2;
   int y = (r.top + r.bottom - h)/2;
   UINT flags = SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_NOZORDER | SWP_NOSIZE;
-  SetWindowPos(handle, 0, x, y, 0, 0, flags);
+  SetWindowPos(handle, nullptr, x, y, 0, 0, flags);
 }
 
 void resizeWindow(HWND handle, int width, int height) {
   RECT r;
   GetWindowRect(handle, &r);
-  SetWindowPos(handle, 0, 0, 0, width, height, SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_NOZORDER | SWP_NOMOVE);
+  SetWindowPos(handle, nullptr, 0, 0, width, height, SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_NOZORDER | SWP_NOMOVE);
   centerWindow(handle, r);
 }
 

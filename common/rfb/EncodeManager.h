@@ -61,7 +61,7 @@ namespace rfb {
                               size_t maxUpdateSize);
 
   protected:
-    virtual bool handleTimeout(Timer* t);
+    void handleTimeout(Timer* t) override;
 
     void doUpdate(bool allowLossy, const Region& changed,
                   const Region& copied, const Point& copy_delta,
@@ -100,8 +100,9 @@ namespace rfb {
   protected:
     // Templated, optimised methods
     template<class T>
-    inline bool checkSolidTile(const Rect& r, const T,
-                               const PixelBuffer *pb);
+    inline bool checkSolidTile(int width, int height,
+                               const T* buffer, int stride,
+                               const T colourValue);
     template<class T>
     inline bool analyseRect(int width, int height,
                             const T* buffer, int stride,
@@ -142,7 +143,7 @@ namespace rfb {
                   const uint8_t* data_, int stride);
 
     private:
-      virtual uint8_t* getBufferRW(const Rect& r, int* stride);
+      uint8_t* getBufferRW(const Rect& r, int* stride) override;
     };
 
     OffsetPixelBuffer offsetPixelBuffer;

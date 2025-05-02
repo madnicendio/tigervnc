@@ -47,7 +47,7 @@ class ServerDialog extends Dialog implements Runnable {
     super(true);
     this.vncServerName = vncServerName;
     setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
-    setTitle("VNC Viewer: Connection Details");
+    setTitle("VNC viewer: Connection details");
     setResizable(false);
     addWindowListener(new WindowAdapter() {
       public void windowClosing(WindowEvent e) {
@@ -235,7 +235,7 @@ class ServerDialog extends Dialog implements Runnable {
 
   private void handleLoad() {
     String title = "Select a TigerVNC configuration file";
-    File dflt = new File(FileUtils.getVncHomeDir().concat("default.tigervnc"));
+    File dflt = new File(FileUtils.getVncConfigDir().concat("default.tigervnc"));
     FileNameExtensionFilter filter =
       new FileNameExtensionFilter("TigerVNC configuration (*.tigervnc)", "tigervnc");
     File f = showChooser(title, dflt, filter);
@@ -245,9 +245,9 @@ class ServerDialog extends Dialog implements Runnable {
 
   private void handleSaveAs() {
     String title = "Save the TigerVNC configuration to file";
-    File dflt = new File(FileUtils.getVncHomeDir().concat("default.tigervnc"));
+    File dflt = new File(FileUtils.getVncConfigDir().concat("default.tigervnc"));
     if (!dflt.exists() || !dflt.isFile())
-      dflt = new File(FileUtils.getVncHomeDir());
+      dflt = new File(FileUtils.getVncConfigDir());
     FileNameExtensionFilter filter =
       new FileNameExtensionFilter("TigerVNC configuration (*.tigervnc)", "tigervnc");
     File f = showChooser(title, dflt, filter);

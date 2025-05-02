@@ -1,4 +1,4 @@
-/* Copyright 2011 Pierre Ossman <ossman@cendio.se> for Cendio AB
+/* Copyright 2011-2025 Pierre Ossman <ossman@cendio.se> for Cendio AB
  * 
  * This is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -21,6 +21,8 @@
 
 class Fl_Window;
 
+void cocoa_prevent_native_fullscreen(Fl_Window *win);
+
 int cocoa_get_level(Fl_Window *win);
 void cocoa_set_level(Fl_Window *win, int level);
 
@@ -33,19 +35,5 @@ CGColorSpaceRef cocoa_win_color_space(Fl_Window *win);
 
 bool cocoa_win_is_zoomed(Fl_Window *win);
 void cocoa_win_zoom(Fl_Window *win);
-
-int cocoa_is_keyboard_sync(const void *event);
-int cocoa_is_keyboard_event(const void *event);
-
-int cocoa_is_key_press(const void *event);
-
-int cocoa_event_keycode(const void *event);
-int cocoa_event_keysym(const void *event);
-
-int cocoa_set_caps_lock_state(bool on);
-int cocoa_set_num_lock_state(bool on);
-
-int cocoa_get_caps_lock_state(bool *on);
-int cocoa_get_num_lock_state(bool *on);
 
 #endif

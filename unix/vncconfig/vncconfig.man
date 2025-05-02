@@ -7,7 +7,7 @@ vncconfig \- configure and control a VNC server
 .br
 .B vncconfig
 .RI [ parameters ] 
-.B \-connect
+.B \-connect \fP[\fB-view-only\fP]
 .IR host [: port ]
 .br
 .B vncconfig
@@ -55,12 +55,17 @@ is no VNC extension.
 
 .SH OPTIONS
 .TP
-.B \-connect \fIhost\fP[:\fIport\fP]
+.B \-connect \fP[\fB-view-only\fP] \fIhost\fP[:\fIport\fP]
 Tells an Xvnc server to make a "reverse" connection to a listening VNC viewer
 (normally connections are made the other way round - the viewer connects to the
 server). \fIhost\fP is the host where the listening viewer is running. If it's
 not listening on the default port of 5500, you can specify \fIhost:port\fP
-instead.
+instead. The \fB-view-only\fP option specifies that the server must ignore all
+keyboard or mouse events sent by the client.
+.
+.TP
+.B \-desc \fIXvnc-param\fP
+Prints a short description of the given Xvnc parameter.
 .
 .TP
 .B \-disconnect
@@ -68,22 +73,18 @@ This causes Xvnc to disconnect from all viewers so that the VNC desktop is not
 displayed anywhere.
 .
 .TP
-[\fB-set\fP] \fIXvnc-param\fP=\fIvalue\fP
-Sets an Xvnc parameter to the given value.  Note that some of Xvnc's parameters
-are read only once at startup so that changing them in this way may not have
-any effect.
+.B \-get \fIXvnc-param\fP
+Prints the current value of the given Xvnc parameter.
 .
 .TP
 .B \-list
 Lists all the parameters supported by Xvnc.
 .
 .TP
-.B \-get \fIXvnc-param\fP
-Prints the current value of the given Xvnc parameter.
-.
-.TP
-.B \-desc \fIXvnc-param\fP
-Prints a short description of the given Xvnc parameter.
+[\fB-set\fP] \fIXvnc-param\fP=\fIvalue\fP
+Sets an Xvnc parameter to the given value.  Note that some of Xvnc's parameters
+are read only once at startup so that changing them in this way may not have
+any effect.
 
 .SH PARAMETERS
 .B vncconfig
@@ -101,12 +102,12 @@ Other valid forms are \fIparam\fP\fB=\fP\fIvalue\fP -\fIparam\fP=\fIvalue\fP
 Specifies the Xvnc server to control.
 .
 .TP
-.B \-nowin
-When run as a "helper" app, don't put up a window.
-.
-.TP
 .B \-iconic
 When run as a "helper" app, make the window iconified at startup.
+.
+.TP
+.B \-nowin
+When run as a "helper" app, don't put up a window.
 
 .SH SEE ALSO
 .BR vncpasswd (1),

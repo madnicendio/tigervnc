@@ -1,19 +1,18 @@
 /* Convenience header for conditional use of GNU <libintl.h>.
-   Copyright (C) 1995-1998, 2000-2002, 2004-2006, 2009-2018 Free Software
-   Foundation, Inc.
+   Copyright (C) 1995-2024 Free Software Foundation, Inc.
 
-   This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 2, or (at your option)
-   any later version.
+   This program is free software: you can redistribute it and/or modify
+   it under the terms of the GNU Lesser General Public License as published by
+   the Free Software Foundation; either version 2.1 of the License, or
+   (at your option) any later version.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU Lesser General Public License for more details.
 
-   You should have received a copy of the GNU General Public License along
-   with this program; if not, see <https://www.gnu.org/licenses/>.  */
+   You should have received a copy of the GNU Lesser General Public License
+   along with this program.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #ifndef _LIBGETTEXT_H
 #define _LIBGETTEXT_H 1
@@ -83,13 +82,13 @@
 # define dcngettext(Domainname, Msgid1, Msgid2, N, Category) \
     ((void) (Category), dngettext (Domainname, Msgid1, Msgid2, N))
 # undef textdomain
-# define textdomain(Domainname) ((const char *) (Domainname))
+# define textdomain(Domainname) ((void) (Domainname))
 # undef bindtextdomain
 # define bindtextdomain(Domainname, Dirname) \
-    ((void) (Domainname), (const char *) (Dirname))
+    ((void) (Domainname), (void) (Dirname))
 # undef bind_textdomain_codeset
 # define bind_textdomain_codeset(Domainname, Codeset) \
-    ((void) (Domainname), (const char *) (Codeset))
+    ((void) (Domainname), (void) (Codeset))
 
 #endif
 
@@ -120,7 +119,7 @@
    pgettext_aux (DEFAULT_TEXT_DOMAIN, Msgctxt GETTEXT_CONTEXT_GLUE Msgid, Msgid, LC_MESSAGES)
 #else
 # define pgettext(Msgctxt, Msgid) \
-   pgettext_aux (NULL, Msgctxt GETTEXT_CONTEXT_GLUE Msgid, Msgid, LC_MESSAGES)
+   pgettext_aux (nullptr, Msgctxt GETTEXT_CONTEXT_GLUE Msgid, Msgid, LC_MESSAGES)
 #endif
 #define dpgettext(Domainname, Msgctxt, Msgid) \
   pgettext_aux (Domainname, Msgctxt GETTEXT_CONTEXT_GLUE Msgid, Msgid, LC_MESSAGES)
@@ -131,14 +130,14 @@
    npgettext_aux (DEFAULT_TEXT_DOMAIN, Msgctxt GETTEXT_CONTEXT_GLUE Msgid, Msgid, MsgidPlural, N, LC_MESSAGES)
 #else
 # define npgettext(Msgctxt, Msgid, MsgidPlural, N) \
-   npgettext_aux (NULL, Msgctxt GETTEXT_CONTEXT_GLUE Msgid, Msgid, MsgidPlural, N, LC_MESSAGES)
+   npgettext_aux (nullptr, Msgctxt GETTEXT_CONTEXT_GLUE Msgid, Msgid, MsgidPlural, N, LC_MESSAGES)
 #endif
 #define dnpgettext(Domainname, Msgctxt, Msgid, MsgidPlural, N) \
   npgettext_aux (Domainname, Msgctxt GETTEXT_CONTEXT_GLUE Msgid, Msgid, MsgidPlural, N, LC_MESSAGES)
 #define dcnpgettext(Domainname, Msgctxt, Msgid, MsgidPlural, N, Category) \
   npgettext_aux (Domainname, Msgctxt GETTEXT_CONTEXT_GLUE Msgid, Msgid, MsgidPlural, N, Category)
 
-#ifdef __GNUC__
+#if defined __GNUC__ || defined __clang__
 __inline
 #else
 #ifdef __cplusplus
@@ -157,7 +156,7 @@ pgettext_aux (const char *domain,
     return translation;
 }
 
-#ifdef __GNUC__
+#if defined __GNUC__ || defined __clang__
 __inline
 #else
 #ifdef __cplusplus
@@ -184,9 +183,17 @@ npgettext_aux (const char *domain,
 
 #include <string.h>
 
-#if (((__GNUC__ >= 3 || __GNUG__ >= 2) && !defined __STRICT_ANSI__ && !defined __cplusplus) \
-     /* || __STDC_VERSION__ == 199901L
-        || (__STDC_VERSION__ >= 201112L && !defined __STDC_NO_VLA__) */ )
+/* GNULIB_NO_VLA can be defined to disable use of VLAs even if supported.
+   This relates to the -Wvla and -Wvla-larger-than warnings, enabled in
+   the default GCC many warnings set.  This allows programs to disable use
+   of VLAs, which may be unintended, or may be awkward to support portably,
+   or may have security implications due to non-deterministic stack usage.  */
+
+#if (!defined GNULIB_NO_VLA \
+     && (((__GNUC__ >= 3 || defined __clang__) \
+          && !defined __STRICT_ANSI__ && !defined __cplusplus) \
+         /* || (__STDC_VERSION__ == 199901L && !defined __HP_cc)
+            || (__STDC_VERSION__ >= 201112L && !defined __STDC_NO_VLA__) */ ))
 # define _LIBGETTEXT_HAVE_VARIABLE_SIZE_ARRAYS 1
 #else
 # define _LIBGETTEXT_HAVE_VARIABLE_SIZE_ARRAYS 0
@@ -197,11 +204,11 @@ npgettext_aux (const char *domain,
 #endif
 
 #define pgettext_expr(Msgctxt, Msgid) \
-  dcpgettext_expr (NULL, Msgctxt, Msgid, LC_MESSAGES)
+  dcpgettext_expr (nullptr, Msgctxt, Msgid, LC_MESSAGES)
 #define dpgettext_expr(Domainname, Msgctxt, Msgid) \
   dcpgettext_expr (Domainname, Msgctxt, Msgid, LC_MESSAGES)
 
-#ifdef __GNUC__
+#if defined __GNUC__ || defined __clang__
 __inline
 #else
 #ifdef __cplusplus
@@ -224,7 +231,7 @@ dcpgettext_expr (const char *domain,
     (msgctxt_len + msgid_len <= sizeof (buf)
      ? buf
      : (char *) malloc (msgctxt_len + msgid_len));
-  if (msg_ctxt_id != NULL)
+  if (msg_ctxt_id != nullptr)
 #endif
     {
       int found_translation;
@@ -244,11 +251,11 @@ dcpgettext_expr (const char *domain,
 }
 
 #define npgettext_expr(Msgctxt, Msgid, MsgidPlural, N) \
-  dcnpgettext_expr (NULL, Msgctxt, Msgid, MsgidPlural, N, LC_MESSAGES)
+  dcnpgettext_expr (nullptr, Msgctxt, Msgid, MsgidPlural, N, LC_MESSAGES)
 #define dnpgettext_expr(Domainname, Msgctxt, Msgid, MsgidPlural, N) \
   dcnpgettext_expr (Domainname, Msgctxt, Msgid, MsgidPlural, N, LC_MESSAGES)
 
-#ifdef __GNUC__
+#if defined __GNUC__ || defined __clang__
 __inline
 #else
 #ifdef __cplusplus
@@ -272,7 +279,7 @@ dcnpgettext_expr (const char *domain,
     (msgctxt_len + msgid_len <= sizeof (buf)
      ? buf
      : (char *) malloc (msgctxt_len + msgid_len));
-  if (msg_ctxt_id != NULL)
+  if (msg_ctxt_id != nullptr)
 #endif
     {
       int found_translation;

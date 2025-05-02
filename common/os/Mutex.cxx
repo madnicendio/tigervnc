@@ -41,9 +41,9 @@ Mutex::Mutex()
   int ret;
 
   systemMutex = new pthread_mutex_t;
-  ret = pthread_mutex_init((pthread_mutex_t*)systemMutex, NULL);
+  ret = pthread_mutex_init((pthread_mutex_t*)systemMutex, nullptr);
   if (ret != 0)
-    throw rdr::SystemException("Failed to create mutex", ret);
+    throw rdr::posix_error("Failed to create mutex", ret);
 #endif
 }
 
@@ -67,7 +67,7 @@ void Mutex::lock()
 
   ret = pthread_mutex_lock((pthread_mutex_t*)systemMutex);
   if (ret != 0)
-    throw rdr::SystemException("Failed to lock mutex", ret);
+    throw rdr::posix_error("Failed to lock mutex", ret);
 #endif
 }
 
@@ -80,13 +80,13 @@ void Mutex::unlock()
 
   ret = pthread_mutex_unlock((pthread_mutex_t*)systemMutex);
   if (ret != 0)
-    throw rdr::SystemException("Failed to unlock mutex", ret);
+    throw rdr::posix_error("Failed to unlock mutex", ret);
 #endif
 }
 
-Condition::Condition(Mutex* mutex)
+Condition::Condition(Mutex* mutex_)
 {
-  this->mutex = mutex;
+  this->mutex = mutex_;
 
 #ifdef WIN32
   systemCondition = new CONDITION_VARIABLE;
@@ -95,9 +95,9 @@ Condition::Condition(Mutex* mutex)
   int ret;
 
   systemCondition = new pthread_cond_t;
-  ret = pthread_cond_init((pthread_cond_t*)systemCondition, NULL);
+  ret = pthread_cond_init((pthread_cond_t*)systemCondition, nullptr);
   if (ret != 0)
-    throw rdr::SystemException("Failed to create condition variable", ret);
+    throw rdr::posix_error("Failed to create condition variable", ret);
 #endif
 }
 
@@ -120,14 +120,14 @@ void Condition::wait()
                                  (CRITICAL_SECTION*)mutex->systemMutex,
                                  INFINITE);
   if (!ret)
-    throw rdr::SystemException("Failed to wait on condition variable", GetLastError());
+    throw rdr::win32_error("Failed to wait on condition variable", GetLastError());
 #else
   int ret;
 
   ret = pthread_cond_wait((pthread_cond_t*)systemCondition,
                           (pthread_mutex_t*)mutex->systemMutex);
   if (ret != 0)
-    throw rdr::SystemException("Failed to wait on condition variable", ret);
+    throw rdr::posix_error("Failed to wait on condition variable", ret);
 #endif
 }
 
@@ -140,7 +140,7 @@ void Condition::signal()
 
   ret = pthread_cond_signal((pthread_cond_t*)systemCondition);
   if (ret != 0)
-    throw rdr::SystemException("Failed to signal condition variable", ret);
+    throw rdr::posix_error("Failed to signal condition variable", ret);
 #endif
 }
 
@@ -153,6 +153,6 @@ void Condition::broadcast()
 
   ret = pthread_cond_broadcast((pthread_cond_t*)systemCondition);
   if (ret != 0)
-    throw rdr::SystemException("Failed to broadcast condition variable", ret);
+    throw rdr::posix_error("Failed to broadcast condition variable", ret);
 #endif
 }

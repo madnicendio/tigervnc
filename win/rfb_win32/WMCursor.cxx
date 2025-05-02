@@ -32,8 +32,8 @@ using namespace rfb::win32;
 
 static LogWriter vlog("WMCursor");
 
-WMCursor::WMCursor() : cursor(0) {
-  cursor = (HCURSOR)LoadImage(0, IDC_ARROW, IMAGE_CURSOR, 0, 0, LR_DEFAULTSIZE | LR_SHARED);
+WMCursor::WMCursor() : cursor(nullptr) {
+  cursor = (HCURSOR)LoadImage(nullptr, IDC_ARROW, IMAGE_CURSOR, 0, 0, LR_DEFAULTSIZE | LR_SHARED);
 }
 
 WMCursor::~WMCursor() {
@@ -45,7 +45,7 @@ WMCursor::getCursorInfo() {
   CURSORINFO info;
   info.cbSize = sizeof(CURSORINFO);
   if (!GetCursorInfo(&info))
-    throw rdr::SystemException("GetCursorInfo failed", GetLastError());
+    throw rdr::win32_error("GetCursorInfo failed", GetLastError());
   result.cursor = info.hCursor;
   result.position = Point(info.ptScreenPos.x, info.ptScreenPos.y);
   result.visible = info.flags & CURSOR_SHOWING;

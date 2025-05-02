@@ -23,13 +23,15 @@
 #include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
-#include <rdr/Exception.h>
+
+#include <stdexcept>
+
 #include <rfb/util.h>
 
 namespace rfb {
 
   static bool isAllSpace(const char *string) {
-    if (string == NULL)
+    if (string == nullptr)
       return false;
     while(*string != '\0') {
       if (! isspace(*string))
@@ -39,15 +41,15 @@ namespace rfb {
     return true;
   }
 
-  static void getHostAndPort(const char* hi, std::string* host,
-                             int* port, int basePort=5900)
+  static inline void getHostAndPort(const char* hi, std::string* host,
+                                    int* port, int basePort=5900)
   {
     const char* hostStart;
     const char* hostEnd;
     const char* portStart;
 
-    if (hi == NULL)
-      throw rdr::Exception("NULL host specified");
+    if (hi == nullptr)
+      throw std::invalid_argument("NULL host specified");
 
     // Trim leading whitespace
     while(isspace(*hi))
@@ -59,19 +61,19 @@ namespace rfb {
     if (hi[0] == '[') {
       hostStart = &hi[1];
       hostEnd = strchr(hostStart, ']');
-      if (hostEnd == NULL)
-        throw rdr::Exception("unmatched [ in host");
+      if (hostEnd == nullptr)
+        throw std::invalid_argument("Unmatched [ in host");
 
       portStart = hostEnd + 1;
       if (isAllSpace(portStart))
-        portStart = NULL;
+        portStart = nullptr;
     } else {
       hostStart = &hi[0];
       hostEnd = strrchr(hostStart, ':');
 
-      if (hostEnd == NULL) {
+      if (hostEnd == nullptr) {
         hostEnd = hostStart + strlen(hostStart);
-        portStart = NULL;
+        portStart = nullptr;
       } else {
         if ((hostEnd > hostStart) && (hostEnd[-1] == ':'))
           hostEnd--;
@@ -79,7 +81,7 @@ namespace rfb {
         if (portStart != hostEnd) {
           // We found more : in the host. This is probably an IPv6 address
           hostEnd = hostStart + strlen(hostStart);
-          portStart = NULL;
+          portStart = nullptr;
         }
       }
     }
@@ -93,20 +95,20 @@ namespace rfb {
     else
       *host = std::string(hostStart, hostEnd - hostStart);
 
-    if (portStart == NULL)
+    if (portStart == nullptr)
       *port = basePort;
     else {
       char* end;
 
       if (portStart[0] != ':')
-        throw rdr::Exception("invalid port specified");
+        throw std::invalid_argument("Invalid port specified");
 
       if (portStart[1] != ':')
         *port = strtol(portStart + 1, &end, 10);
       else
         *port = strtol(portStart + 2, &end, 10);
       if (*end != '\0' && ! isAllSpace(end))
-        throw rdr::Exception("invalid port specified");
+        throw std::invalid_argument("Invalid port specified");
 
       if ((portStart[1] != ':') && (*port < 100))
         *port += basePort;

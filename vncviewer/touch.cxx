@@ -36,7 +36,6 @@
 #include <FL/Fl.H>
 #include <FL/x.H>
 
-#include <rfb/Exception.h>
 #include <rfb/LogWriter.h>
 
 #include "i18n.h"
@@ -103,7 +102,7 @@ static void x11_change_touch_ownership(bool enable)
 
   for (iter = handlers.begin(); iter != handlers.end(); ++iter) {
     curmasks = XIGetSelectedEvents(fl_display, iter->first, &num_masks);
-    if (curmasks == NULL) {
+    if (curmasks == nullptr) {
       if (num_masks == -1)
         vlog.error(_("Unable to get X Input 2 event mask for window 0x%08lx"), iter->first);
       continue;
@@ -180,9 +179,9 @@ static int handleTouchEvent(void *event, void* /*data*/)
   if (msg->message == WM_PAINT && handlers.count(msg->hwnd) == 0) {
     try {
       handlers[msg->hwnd] = new Win32TouchHandler(msg->hwnd);
-    } catch (rfb::Exception& e) {
-      vlog.error(_("Failed to create touch handler: %s"), e.str());
-      abort_vncviewer(_("Failed to create touch handler: %s"), e.str());
+    } catch (std::exception& e) {
+      vlog.error(_("Failed to create touch handler: %s"), e.what());
+      abort_vncviewer(_("Failed to create touch handler: %s"), e.what());
     }
     // Add a special hook-in for handling events sent directly to WndProc
     if (!SetWindowSubclass(msg->hwnd, &win32WindowProc, 1, 0)) {
@@ -267,7 +266,7 @@ void enable_touch()
     vlog.error(_("X Input 2.2 (or newer) is not available. Touch gestures will not be supported."));
 #endif
 
-  Fl::add_system_handler(handleTouchEvent, NULL);
+  Fl::add_system_handler(handleTouchEvent, nullptr);
 }
 
 void disable_touch()

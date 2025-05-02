@@ -41,20 +41,20 @@ ssize_t TLSOutStream::push(gnutls_transport_ptr_t str, const void* data,
   OutStream *out = self->out;
 
   delete self->saved_exception;
-  self->saved_exception = NULL;
+  self->saved_exception = nullptr;
 
   try {
     out->writeBytes((const uint8_t*)data, size);
     out->flush();
-  } catch (SystemException &e) {
-    vlog.error("Failure sending TLS data: %s", e.str());
+  } catch (socket_error& e) {
+    vlog.error("Failure sending TLS data: %s", e.what());
     gnutls_transport_set_errno(self->session, e.err);
-    self->saved_exception = new SystemException(e);
+    self->saved_exception = new socket_error(e);
     return -1;
-  } catch (Exception& e) {
-    vlog.error("Failure sending TLS data: %s", e.str());
+  } catch (std::exception& e) {
+    vlog.error("Failure sending TLS data: %s", e.what());
     gnutls_transport_set_errno(self->session, EINVAL);
-    self->saved_exception = new Exception(e);
+    self->saved_exception = new std::runtime_error(e.what());
     return -1;
   }
 
@@ -62,7 +62,7 @@ ssize_t TLSOutStream::push(gnutls_transport_ptr_t str, const void* data,
 }
 
 TLSOutStream::TLSOutStream(OutStream* _out, gnutls_session_t _session)
-  : session(_session), out(_out), saved_exception(NULL)
+  : session(_session), out(_out), saved_exception(nullptr)
 {
   gnutls_transport_ptr_t recv, send;
 
@@ -79,7 +79,7 @@ TLSOutStream::~TLSOutStream()
   } catch (Exception&) {
   }
 #endif
-  gnutls_transport_set_push_function(session, NULL);
+  gnutls_transport_set_push_function(session, nullptr);
 
   delete saved_exception;
 }
@@ -114,11 +114,15 @@ size_t TLSOutStream::writeTLS(const uint8_t* data, size_t length)
   if (n == GNUTLS_E_INTERRUPTED || n == GNUTLS_E_AGAIN)
     return 0;
 
-  if (n == GNUTLS_E_PUSH_ERROR)
-    throw *saved_exception;
+  if (n == GNUTLS_E_PUSH_ERROR) {
+    if (dynamic_cast<socket_error*>(saved_exception))
+      throw *dynamic_cast<socket_error*>(saved_exception);
+    else
+      throw std::runtime_error(saved_exception->what());
+  }
 
   if (n < 0)
-    throw TLSException("writeTLS", n);
+    throw tls_error("writeTLS", n);
 
   return n;
 }

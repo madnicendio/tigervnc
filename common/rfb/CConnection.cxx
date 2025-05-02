@@ -25,6 +25,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <algorithm>
+
 #include <rfb/Exception.h>
 #include <rfb/clipboardTypes.h>
 #include <rfb/fenceTypes.h>
@@ -32,10 +34,15 @@
 #include <rfb/CMsgWriter.h>
 #include <rfb/CSecurity.h>
 #include <rfb/Decoder.h>
+#include <rfb/KeysymStr.h>
 #include <rfb/Security.h>
 #include <rfb/SecurityClient.h>
 #include <rfb/CConnection.h>
 #include <rfb/util.h>
+
+#define XK_MISCELLANY
+#define XK_XKB_KEYS
+#include <rfb/keysymdef.h>
 
 #include <rfb/LogWriter.h>
 
@@ -47,10 +54,10 @@ using namespace rfb;
 static LogWriter vlog("CConnection");
 
 CConnection::CConnection()
-  : csecurity(0),
+  : csecurity(nullptr),
     supportsLocalCursor(false), supportsCursorPosition(false),
     supportsDesktopResize(false), supportsLEDState(false),
-    is(0), os(0), reader_(0), writer_(0),
+    is(nullptr), os(nullptr), reader_(nullptr), writer_(nullptr),
     shared(false),
     state_(RFBSTATE_UNINITIALISED),
     pendingPFChange(false), preferredEncoding(encodingTight),
@@ -58,7 +65,7 @@ CConnection::CConnection()
     formatChange(false), encodingChange(false),
     firstUpdate(true), pendingUpdate(false), continuousUpdates(false),
     forceNonincremental(true),
-    framebuffer(NULL), decoder(this),
+    framebuffer(nullptr), decoder(this),
     hasRemoteClipboard(false), hasLocalClipboard(false)
 {
 }
@@ -70,7 +77,7 @@ CConnection::~CConnection()
 
 void CConnection::setServerName(const char* name_)
 {
-  if (name_ == NULL)
+  if (name_ == nullptr)
     name_ = "";
   serverName = name_;
 }
@@ -90,7 +97,7 @@ void CConnection::setFramebuffer(ModifiablePixelBuffer* fb)
     assert(fb->height() == server.height());
   }
 
-  if ((framebuffer != NULL) && (fb != NULL)) {
+  if ((framebuffer != nullptr) && (fb != nullptr)) {
     Rect rect;
 
     const uint8_t* data;
@@ -144,11 +151,11 @@ bool CConnection::processMsg()
   case RFBSTATE_INITIALISATION:   return processInitMsg();           break;
   case RFBSTATE_NORMAL:           return reader_->readMsg();         break;
   case RFBSTATE_CLOSING:
-    throw Exception("CConnection::processMsg: called while closing");
+    throw std::logic_error("CConnection::processMsg: Called while closing");
   case RFBSTATE_UNINITIALISED:
-    throw Exception("CConnection::processMsg: not initialised yet?");
+    throw std::logic_error("CConnection::processMsg: Not initialised yet?");
   default:
-    throw Exception("CConnection::processMsg: invalid state");
+    throw std::logic_error("CConnection::processMsg: Invalid state");
   }
 }
 
@@ -158,7 +165,7 @@ bool CConnection::processVersionMsg()
   int majorVersion;
   int minorVersion;
 
-  vlog.debug("reading protocol version");
+  vlog.debug("Reading protocol version");
 
   if (!is->hasData(12))
     return false;
@@ -169,7 +176,7 @@ bool CConnection::processVersionMsg()
   if (sscanf(verStr, "RFB %03d.%03d\n",
              &majorVersion, &minorVersion) != 2) {
     state_ = RFBSTATE_INVALID;
-    throw Exception("reading version failed: not an RFB server?");
+    throw protocol_error("Reading version failed, not an RFB server?");
   }
 
   server.setVersion(majorVersion, minorVersion);
@@ -182,8 +189,10 @@ bool CConnection::processVersionMsg()
     vlog.error("Server gave unsupported RFB protocol version %d.%d",
                server.majorVersion, server.minorVersion);
     state_ = RFBSTATE_INVALID;
-    throw Exception("Server gave unsupported RFB protocol version %d.%d",
-                    server.majorVersion, server.minorVersion);
+    throw protocol_error(format("Server gave unsupported RFB protocol "
+                                "version %d.%d",
+                                server.majorVersion,
+                                server.minorVersion));
   } else if (server.beforeVersion(3,7)) {
     server.setVersion(3,3);
   } else if (server.afterVersion(3,8)) {
@@ -206,7 +215,7 @@ bool CConnection::processVersionMsg()
 
 bool CConnection::processSecurityTypesMsg()
 {
-  vlog.debug("processing security types message");
+  vlog.debug("Processing security types message");
 
   int secType = secTypeInvalid;
 
@@ -225,18 +234,12 @@ bool CConnection::processSecurityTypesMsg()
       state_ = RFBSTATE_SECURITY_REASON;
       return true;
     } else if (secType == secTypeNone || secType == secTypeVncAuth) {
-      std::list<uint8_t>::iterator i;
-      for (i = secTypes.begin(); i != secTypes.end(); i++)
-        if (*i == secType) {
-          secType = *i;
-          break;
-        }
-
-      if (i == secTypes.end())
+      if (std::find(secTypes.begin(), secTypes.end(),
+                    secType) == secTypes.end())
         secType = secTypeInvalid;
     } else {
       vlog.error("Unknown 3.3 security type %d", secType);
-      throw Exception("Unknown 3.3 security type");
+      throw protocol_error("Unknown 3.3 security type");
     }
 
   } else {
@@ -259,8 +262,6 @@ bool CConnection::processSecurityTypesMsg()
       return true;
     }
 
-    std::list<uint8_t>::iterator j;
-
     for (int i = 0; i < nServerSecTypes; i++) {
       uint8_t serverSecType = is->readU8();
       vlog.debug("Server offers security type %s(%d)",
@@ -271,12 +272,10 @@ bool CConnection::processSecurityTypesMsg()
        * It means server's order specifies priority.
        */
       if (secType == secTypeInvalid) {
-        for (j = secTypes.begin(); j != secTypes.end(); j++)
-          if (*j == serverSecType) {
-            secType = *j;
-            break;
-          }
-       }
+        if (std::find(secTypes.begin(), secTypes.end(),
+                      serverSecType) != secTypes.end())
+          secType = serverSecType;
+      }
     }
 
     // Inform the server of our decision
@@ -290,7 +289,7 @@ bool CConnection::processSecurityTypesMsg()
   if (secType == secTypeInvalid) {
     state_ = RFBSTATE_INVALID;
     vlog.error("No matching security types");
-    throw Exception("No matching security types");
+    throw protocol_error("No matching security types");
   }
 
   state_ = RFBSTATE_SECURITY;
@@ -301,7 +300,7 @@ bool CConnection::processSecurityTypesMsg()
 
 bool CConnection::processSecurityMsg()
 {
-  vlog.debug("processing security message");
+  vlog.debug("Processing security message");
   if (!csecurity->processMsg())
     return false;
 
@@ -312,7 +311,7 @@ bool CConnection::processSecurityMsg()
 
 bool CConnection::processSecurityResultMsg()
 {
-  vlog.debug("processing security result message");
+  vlog.debug("Processing security result message");
   int result;
 
   if (server.beforeVersion(3,8) && csecurity->getType() == secTypeNone) {
@@ -328,18 +327,18 @@ bool CConnection::processSecurityResultMsg()
     securityCompleted();
     return true;
   case secResultFailed:
-    vlog.debug("auth failed");
+    vlog.debug("Auth failed");
     break;
   case secResultTooMany:
-    vlog.debug("auth failed - too many tries");
+    vlog.debug("Auth failed: Too many tries");
     break;
   default:
-    throw Exception("Unknown security result from server");
+    throw protocol_error("Unknown security result from server");
   }
 
   if (server.beforeVersion(3,8)) {
     state_ = RFBSTATE_INVALID;
-    throw AuthFailureException();
+    throw auth_error("Authentication failed");
   }
 
   state_ = RFBSTATE_SECURITY_REASON;
@@ -348,7 +347,7 @@ bool CConnection::processSecurityResultMsg()
 
 bool CConnection::processSecurityReasonMsg()
 {
-  vlog.debug("processing security reason message");
+  vlog.debug("Processing security reason message");
 
   if (!is->hasData(4))
     return false;
@@ -365,12 +364,12 @@ bool CConnection::processSecurityReasonMsg()
   reason[len] = '\0';
 
   state_ = RFBSTATE_INVALID;
-  throw AuthFailureException(reason.data());
+  throw auth_error(reason.data());
 }
 
 bool CConnection::processInitMsg()
 {
-  vlog.debug("reading server initialisation");
+  vlog.debug("Reading server initialisation");
   return reader_->readServerInit();
 }
 
@@ -394,17 +393,17 @@ void CConnection::close()
    */
   try {
     decoder.flush();
-  } catch (rdr::Exception& e) {
-    vlog.error("%s", e.str());
+  } catch (std::exception& e) {
+    vlog.error("%s", e.what());
   }
 
-  setFramebuffer(NULL);
+  setFramebuffer(nullptr);
   delete csecurity;
-  csecurity = NULL;
+  csecurity = nullptr;
   delete reader_;
-  reader_ = NULL;
+  reader_ = nullptr;
   delete writer_;
-  writer_ = NULL;
+  writer_ = nullptr;
 }
 
 void CConnection::setDesktopSize(int w, int h)
@@ -419,7 +418,7 @@ void CConnection::setDesktopSize(int w, int h)
                                            server.height());
 
   resizeFramebuffer();
-  assert(framebuffer != NULL);
+  assert(framebuffer != nullptr);
   assert(framebuffer->width() == server.width());
   assert(framebuffer->height() == server.height());
 }
@@ -439,7 +438,7 @@ void CConnection::setExtendedDesktopSize(unsigned reason,
                                            server.height());
 
   resizeFramebuffer();
-  assert(framebuffer != NULL);
+  assert(framebuffer != nullptr);
   assert(framebuffer->width() == server.width());
   assert(framebuffer->height() == server.height());
 }
@@ -467,10 +466,10 @@ void CConnection::serverInit(int width, int height,
   CMsgHandler::serverInit(width, height, pf, name);
 
   state_ = RFBSTATE_NORMAL;
-  vlog.debug("initialisation done");
+  vlog.debug("Initialisation done");
 
   initDone();
-  assert(framebuffer != NULL);
+  assert(framebuffer != nullptr);
   assert(framebuffer->width() == server.width());
   assert(framebuffer->height() == server.height());
 
@@ -500,7 +499,7 @@ void CConnection::framebufferUpdateStart()
 {
   CMsgHandler::framebufferUpdateStart();
 
-  assert(framebuffer != NULL);
+  assert(framebuffer != nullptr);
 
   // Note: This might not be true if continuous updates are supported
   pendingUpdate = false;
@@ -682,7 +681,7 @@ void CConnection::sendClipboardData(const char* data)
     // FIXME: This conversion magic should be in CMsgWriter
     std::string filtered(convertCRLF(data));
     size_t sizes[1] = { filtered.size() + 1 };
-    const uint8_t* data[1] = { (const uint8_t*)filtered.c_str() };
+    const uint8_t* datas[1] = { (const uint8_t*)filtered.c_str() };
 
     if (unsolicitedClipboardAttempt) {
       unsolicitedClipboardAttempt = false;
@@ -694,10 +693,93 @@ void CConnection::sendClipboardData(const char* data)
       }
     }
 
-    writer()->writeClipboardProvide(rfb::clipboardUTF8, sizes, data);
+    writer()->writeClipboardProvide(rfb::clipboardUTF8, sizes, datas);
   } else {
     writer()->writeClientCutText(data);
   }
+}
+
+void CConnection::sendKeyPress(int systemKeyCode,
+                               uint32_t keyCode, uint32_t keySym)
+{
+  // For the first few years, there wasn't a good consensus on what the
+  // Windows keys should be mapped to for X11. So we need to help out a
+  // bit and map all variants to the same key...
+  switch (keySym) {
+  case XK_Hyper_L:
+    keySym = XK_Super_L;
+    break;
+  case XK_Hyper_R:
+    keySym = XK_Super_R;
+    break;
+  // There has been several variants for Shift-Tab over the years.
+  // RFB states that we should always send a normal tab.
+  case XK_ISO_Left_Tab:
+    keySym = XK_Tab;
+    break;
+  }
+
+#ifdef __APPLE__
+  // Alt on OS X behaves more like AltGr on other systems, and to get
+  // sane behaviour we should translate things in that manner for the
+  // remote VNC server. However that means we lose the ability to use
+  // Alt as a shortcut modifier. Do what RealVNC does and hijack the
+  // left command key as an Alt replacement.
+  switch (keySym) {
+  case XK_Super_L:
+    keySym = XK_Alt_L;
+    break;
+  case XK_Super_R:
+    keySym = XK_Super_L;
+    break;
+  case XK_Alt_L:
+    keySym = XK_Mode_switch;
+    break;
+  case XK_Alt_R:
+    keySym = XK_ISO_Level3_Shift;
+    break;
+  }
+#endif
+
+  // Because of the way keyboards work, we cannot expect to have the same
+  // symbol on release as when pressed. This breaks the VNC protocol however,
+  // so we need to keep track of what keysym a key _code_ generated on press
+  // and send the same on release.
+  downKeys[systemKeyCode].keyCode = keyCode;
+  downKeys[systemKeyCode].keySym = keySym;
+
+  vlog.debug("Key pressed: %d => 0x%02x / XK_%s (0x%04x)",
+             systemKeyCode, keyCode, KeySymName(keySym), keySym);
+
+  writer()->writeKeyEvent(keySym, keyCode, true);
+}
+
+void CConnection::sendKeyRelease(int systemKeyCode)
+{
+  DownMap::iterator iter;
+
+  iter = downKeys.find(systemKeyCode);
+  if (iter == downKeys.end()) {
+    // These occur somewhat frequently so let's not spam them unless
+    // logging is turned up.
+    vlog.debug("Unexpected release of key code %d", systemKeyCode);
+    return;
+  }
+
+  vlog.debug("Key released: %d => 0x%02x / XK_%s (0x%04x)",
+             systemKeyCode, iter->second.keyCode,
+             KeySymName(iter->second.keySym), iter->second.keySym);
+
+  writer()->writeKeyEvent(iter->second.keySym,
+                          iter->second.keyCode, false);
+
+  downKeys.erase(iter);
+}
+
+void CConnection::releaseAllKeys()
+{
+  while (!downKeys.empty())
+    sendKeyRelease(downKeys.begin()->first);
 }
 
 void CConnection::refreshFramebuffer()
@@ -842,6 +924,7 @@ void CConnection::updateEncodings()
   encodings.push_back(pseudoEncodingContinuousUpdates);
   encodings.push_back(pseudoEncodingFence);
   encodings.push_back(pseudoEncodingQEMUKeyEvent);
+  encodings.push_back(pseudoEncodingExtendedMouseButtons);
 
   if (Decoder::supported(preferredEncoding)) {
     encodings.push_back(preferredEncoding);

@@ -27,9 +27,7 @@
 #endif
 
 #include <rfb/SSecurity.h>
-#include <rfb/SSecurityVeNCrypt.h>
-#include <rdr/InStream.h>
-#include <rdr/OutStream.h>
+
 #include <gnutls/gnutls.h>
 
 /* In GnuTLS 3.6.0 DH parameter generation was deprecated. RFC7919 is used instead.
@@ -39,22 +37,29 @@
 #define SSECURITYTLS__USE_DEPRECATED_DH
 #endif
 
+namespace rdr {
+  class InStream;
+  class OutStream;
+  class TLSInStream;
+  class TLSOutStream;
+}
+
 namespace rfb {
 
   class SSecurityTLS : public SSecurity {
   public:
     SSecurityTLS(SConnection* sc, bool _anon);
     virtual ~SSecurityTLS();
-    virtual bool processMsg();
-    virtual const char* getUserName() const {return 0;}
-    virtual int getType() const { return anon ? secTypeTLSNone : secTypeX509None;}
+    bool processMsg() override;
+    const char* getUserName() const override {return nullptr;}
+    int getType() const override { return anon ? secTypeTLSNone : secTypeX509None;}
 
     static StringParameter X509_CertFile;
     static StringParameter X509_KeyFile;
 
   protected:
     void shutdown();
-    void setParams(gnutls_session_t session);
+    void setParams();
 
   private:
     gnutls_session_t session;
@@ -66,8 +71,8 @@ namespace rfb {
 
     bool anon;
 
-    rdr::InStream* tlsis;
-    rdr::OutStream* tlsos;
+    rdr::TLSInStream* tlsis;
+    rdr::TLSOutStream* tlsos;
 
     rdr::InStream* rawis;
     rdr::OutStream* rawos;

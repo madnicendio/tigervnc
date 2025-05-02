@@ -23,7 +23,6 @@
 #ifndef __RDR_MEMOUTSTREAM_H__
 #define __RDR_MEMOUTSTREAM_H__
 
-#include <rdr/Exception.h>
 #include <rdr/OutStream.h>
 
 namespace rdr {
@@ -41,7 +40,7 @@ namespace rdr {
       delete [] start;
     }
 
-    size_t length() { return ptr - start; }
+    size_t length() override { return ptr - start; }
     void clear() { ptr = start; };
     void clearAndZero() { memset(start, 0, ptr-start); clear(); }
     void reposition(size_t pos) { ptr = start + pos; }
@@ -55,13 +54,13 @@ namespace rdr {
     // overrun() either doubles the buffer or adds enough space for
     // needed bytes.
 
-    virtual void overrun(size_t needed) {
+    void overrun(size_t needed) override {
       size_t len = ptr - start + needed;
       if (len < (size_t)(end - start) * 2)
         len = (end - start) * 2;
 
       if (len < (size_t)(end - start))
-        throw Exception("Overflow in MemOutStream::overrun()");
+        throw std::out_of_range("Overflow in MemOutStream::overrun()");
 
       uint8_t* newStart = new uint8_t[len];
       memcpy(newStart, start, ptr - start);

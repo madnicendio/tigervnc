@@ -34,7 +34,7 @@ Incomplete and generally out of date copyright list::
         Copyright (C) 2009-2011 D. R. Commander
         Copyright (C) 2009-2011 Pierre Ossman for Cendio AB
         Copyright (C) 2004, 2009-2011 Red Hat, Inc.
-        Copyright (C) 2009-2023 TigerVNC Team
+        Copyright (C) 2009-2025 TigerVNC team
         All Rights Reserved.
 
 This software is distributed under the GNU General Public Licence as published
@@ -56,26 +56,26 @@ All versions of TigerVNC contain the following programs:
               VNC server can be running on a Windows or a Unix/Linux machine.
 
 
-Windows-Specific
+Windows-specific
 ================
 
 The Windows version of TigerVNC contains the following programs:
 
-* winvnc - the TigerVNC Server for Windows.  winvnc allows a Windows desktop to
+* winvnc - the TigerVNC server for Windows.  winvnc allows a Windows desktop to
            be accessed remotely using a VNC viewer.
 
 WARNING: winvnc is currently unmaintained and and may not function correctly.
 
-winvnc may not work if the Fast User Switching or Remote Desktop features are
+winvnc may not work if the Fast user switching or Remote desktop features are
 in use.
 
 
-Unix/Linux-Specific (not Mac)
+Unix/Linux-specific (not Mac)
 =============================
 
 The Unix/Linux version of TigerVNC contains the following programs:
 
-* Xvnc - the TigerVNC Server for Unix.  Xvnc is both a VNC server and an X
+* Xvnc - the TigerVNC server for Unix.  Xvnc is both a VNC server and an X
          server with a "virtual" framebuffer.  You should normally use the
          vncserver service to start Xvnc.
 

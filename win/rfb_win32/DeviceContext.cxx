@@ -50,11 +50,11 @@ PixelFormat DeviceContext::getPF(HDC dc) {
   memset(&bi, 0, sizeof(bi));
   bi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
   bi.bmiHeader.biBitCount = 0;
-  if (!::GetDIBits(dc, bitmap, 0, 1, NULL, (BITMAPINFO*)&bi, DIB_RGB_COLORS)) {
-    throw rdr::SystemException("unable to determine device pixel format", GetLastError());
+  if (!::GetDIBits(dc, bitmap, 0, 1, nullptr, (BITMAPINFO*)&bi, DIB_RGB_COLORS)) {
+    throw rdr::win32_error("Unable to determine device pixel format", GetLastError());
   }
-  if (!::GetDIBits(dc, bitmap, 0, 1, NULL, (BITMAPINFO*)&bi, DIB_RGB_COLORS)) {
-    throw rdr::SystemException("unable to determine pixel shifts/palette", GetLastError());
+  if (!::GetDIBits(dc, bitmap, 0, 1, nullptr, (BITMAPINFO*)&bi, DIB_RGB_COLORS)) {
+    throw rdr::win32_error("Unable to determine pixel shifts/palette", GetLastError());
   }
 
   // Set the initial format information
@@ -86,8 +86,8 @@ PixelFormat DeviceContext::getPF(HDC dc) {
         bMask = 0x0000ff;
         break;
       default:
-        vlog.error("bits per pixel %u not supported", bi.bmiHeader.biBitCount);
-        throw rdr::Exception("unknown bits per pixel specified");
+        vlog.error("Bits per pixel %u not supported", bi.bmiHeader.biBitCount);
+        throw std::invalid_argument("Unknown bits per pixel specified");
       };
       break;
     case BI_BITFIELDS:
@@ -115,7 +115,7 @@ PixelFormat DeviceContext::getPF(HDC dc) {
 
     // Check that the depth & bpp are valid
     if (depth > bpp) {
-      vlog.error("depth exceeds bits per pixel!");
+      vlog.error("Depth exceeds bits per pixel!");
       bpp = depth;
     }
 
@@ -151,15 +151,15 @@ Rect DeviceContext::getClipBox(HDC dc) {
   // Get the display dimensions
   RECT cr;
   if (!GetClipBox(dc, &cr))
-    throw rdr::SystemException("GetClipBox", GetLastError());
+    throw rdr::win32_error("GetClipBox", GetLastError());
   return Rect(cr.left, cr.top, cr.right, cr.bottom);
 }
 
 
 DeviceDC::DeviceDC(const char* deviceName) {
-  dc = ::CreateDC("DISPLAY", deviceName, NULL, NULL);
+  dc = ::CreateDC("DISPLAY", deviceName, nullptr, nullptr);
   if (!dc)
-    throw rdr::SystemException("failed to create DeviceDC", GetLastError());
+    throw rdr::win32_error("Failed to create DeviceDC", GetLastError());
 }
 
 DeviceDC::~DeviceDC() {
@@ -171,7 +171,7 @@ DeviceDC::~DeviceDC() {
 WindowDC::WindowDC(HWND wnd) : hwnd(wnd) {
   dc = GetDC(wnd);
   if (!dc)
-    throw rdr::SystemException("GetDC failed", GetLastError());
+    throw rdr::win32_error("GetDC failed", GetLastError());
 }
 
 WindowDC::~WindowDC() {
@@ -183,7 +183,7 @@ WindowDC::~WindowDC() {
 CompatibleDC::CompatibleDC(HDC existing) {
   dc = CreateCompatibleDC(existing);
   if (!dc)
-    throw rdr::SystemException("CreateCompatibleDC failed", GetLastError());
+    throw rdr::win32_error("CreateCompatibleDC failed", GetLastError());
 }
 
 CompatibleDC::~CompatibleDC() {
@@ -195,7 +195,7 @@ CompatibleDC::~CompatibleDC() {
 BitmapDC::BitmapDC(HDC hdc, HBITMAP hbitmap) : CompatibleDC(hdc){
   oldBitmap = (HBITMAP)SelectObject(dc, hbitmap);
   if (!oldBitmap)
-    throw rdr::SystemException("SelectObject to CompatibleDC failed",
+    throw rdr::win32_error("SelectObject to CompatibleDC failed",
     GetLastError());
 }
 

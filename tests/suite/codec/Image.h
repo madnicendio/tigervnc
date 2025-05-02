@@ -1,0 +1,57 @@
+#ifndef __SUITE_IMAGE_H__
+#define __SUITE_IMAGE_H__
+
+#include "../recorder/util.h"
+#include <stdint.h>
+#include <map>
+#include <string>
+
+namespace suite {
+
+  // FIXME: Not sure where to put these, lets leave them here for now.
+  enum EncoderEnum {
+    PPM = 0,
+    JPEG,
+  };
+
+  static std::map<std::string, EncoderEnum> encodersMap = {
+    {"PPM", PPM},
+    {"JPEG", JPEG}
+  };
+
+  inline std::string encoderTypeToString(enum EncoderEnum e)
+  {
+    static std::string strings[] = {
+      "PPM",
+      "JPEG",
+    };
+    return strings[e];
+  }
+
+  struct Pixel
+  {
+    uint8_t r, g, b;
+    friend std::istringstream& operator>>(std::istringstream &in,
+                                          Pixel& pixel);
+  };
+
+  class Image
+  {
+  public:
+    Image(int width, int height, uint8_t* buffer,
+          int size, int offset_x = 0, int offset_y = 0,
+          uint frameTime = 0, ImageUpdateStats stats = ImageUpdateStats{});
+    virtual ~Image();
+    virtual Image& operator+=(Pixel const &pixel);
+    virtual uint8_t* getBuffer() const;
+    const int width_, height_, x_offset_, y_offset_;
+    ImageUpdateStats stats_;
+    uint size_, frameTime_;
+    void setBuffer(uint8_t *buffer, int size);
+  private:
+    uint8_t* buffer_;
+    unsigned int pixelCount;
+  };
+}
+
+#endif // __SUITE_IMAGE_H__

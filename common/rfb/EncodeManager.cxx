@@ -32,7 +32,6 @@
 #include <rfb/SMsgWriter.h>
 #include <rfb/UpdateTracker.h>
 #include <rfb/LogWriter.h>
-#include <rfb/Exception.h>
 #include <rfb/util.h>
 
 #include <rfb/RawEncoder.h>
@@ -142,7 +141,7 @@ EncodeManager::EncodeManager(SConnection* conn_)
 {
   StatsVector::iterator iter;
 
-  encoders.resize(encoderClassMax, NULL);
+  encoders.resize(encoderClassMax, nullptr);
   activeEncoders.resize(encoderTypeMax, encoderRaw);
 
   encoders[encoderRaw] = new RawEncoder(conn);
@@ -166,12 +165,10 @@ EncodeManager::EncodeManager(SConnection* conn_)
 
 EncodeManager::~EncodeManager()
 {
-  std::vector<Encoder*>::iterator iter;
-
   logStats();
 
-  for (iter = encoders.begin();iter != encoders.end();iter++)
-    delete *iter;
+  for (Encoder* encoder : encoders)
+    delete encoder;
 }
 
 void EncodeManager::logStats()
@@ -303,7 +300,7 @@ void EncodeManager::writeLosslessRefresh(const Region& req, const PixelBuffer* p
            Region(), Point(), pb, renderedCursor);
 }
 
-bool EncodeManager::handleTimeout(Timer* t)
+void EncodeManager::handleTimeout(Timer* t)
 {
   if (t == &recentChangeTimer) {
     // Any lossy region that wasn't recently updated can
@@ -313,10 +310,8 @@ bool EncodeManager::handleTimeout(Timer* t)
 
     // Will there be more to do? (i.e. do we need another round)
     if (!lossyRegion.subtract(pendingRefreshRegion).is_empty())
-      return true;
+      t->repeat();
   }
-
-  return false;
 }
 
 void EncodeManager::doUpdate(bool allowLossy, const Region& changed_,
@@ -340,7 +335,7 @@ void EncodeManager::doUpdate(bool allowLossy, const Region& changed_,
      * We need to render the cursor seperately as it has its own
      * magical pixel buffer, so split it out from the changed region.
      */
-    if (renderedCursor != NULL) {
+    if (renderedCursor != nullptr) {
       cursorRegion = changed.intersect(renderedCursor->getEffectiveRect());
       changed.assign_subtract(renderedCursor->getEffectiveRect());
     }
@@ -925,13 +920,24 @@ void EncodeManager::writeSubRect(const Rect& rect, const PixelBuffer *pb)
 bool EncodeManager::checkSolidTile(const Rect& r, const uint8_t* colourValue,
                                    const PixelBuffer *pb)
 {
+  const uint8_t* buffer;
+  int stride;
+
+  buffer = pb->getBuffer(r, &stride);
+
   switch (pb->getPF().bpp) {
   case 32:
-    return checkSolidTile(r, *(const uint32_t*)colourValue, pb);
+    return checkSolidTile(r.width(), r.height(),
+                          (const uint32_t*)buffer, stride,
+                          *(const uint32_t*)colourValue);
   case 16:
-    return checkSolidTile(r, *(const uint16_t*)colourValue, pb);
+    return checkSolidTile(r.width(), r.height(),
+                          (const uint16_t*)buffer, stride,
+                          *(const uint16_t*)colourValue);
   default:
-    return checkSolidTile(r, *(const uint8_t*)colourValue, pb);
+    return checkSolidTile(r.width(), r.height(),
+                          (const uint8_t*)buffer, stride,
+                          *(const uint8_t*)colourValue);
   }
 }
 
@@ -1098,27 +1104,21 @@ void EncodeManager::OffsetPixelBuffer::update(const PixelFormat& pf,
 
 uint8_t* EncodeManager::OffsetPixelBuffer::getBufferRW(const Rect& /*r*/, int* /*stride*/)
 {
-  throw rfb::Exception("Invalid write attempt to OffsetPixelBuffer");
+  throw std::logic_error("Invalid write attempt to OffsetPixelBuffer");
 }
 
 template<class T>
-inline bool EncodeManager::checkSolidTile(const Rect& r,
-                                          const T colourValue,
-                                          const PixelBuffer *pb)
+inline bool EncodeManager::checkSolidTile(int width, int height,
+                                          const T* buffer, int stride,
+                                          const T colourValue)
 {
-  int w, h;
-  const T* buffer;
-  int stride, pad;
+  int pad;
 
-  w = r.width();
-  h = r.height();
+  pad = stride - width;
 
-  buffer = (const T*)pb->getBuffer(r, &stride);
-  pad = stride - w;
-
-  while (h--) {
-    int w_ = w;
-    while (w_--) {
+  while (height--) {
+    int width_ = width;
+    while (width_--) {
       if (*buffer != colourValue)
         return false;
       buffer++;

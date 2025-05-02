@@ -24,20 +24,21 @@
 #include <assert.h>
 #include <string.h>
 
+#include <stdexcept>
+
 #include <rfb/Cursor.h>
 #include <rfb/LogWriter.h>
-#include <rfb/Exception.h>
 
 using namespace rfb;
 
 static LogWriter vlog("Cursor");
 
 Cursor::Cursor(int width, int height, const Point& hotspot,
-               const uint8_t* data) :
+               const uint8_t* data_) :
   width_(width), height_(height), hotspot_(hotspot)
 {
-  this->data = new uint8_t[width_*height_*4];
-  memcpy(this->data, data, width_*height_*4);
+  data = new uint8_t[width_*height_*4];
+  memcpy(data, data_, width_*height_*4);
 }
 
 Cursor::Cursor(const Cursor& other) :
@@ -260,7 +261,7 @@ const uint8_t* RenderedCursor::getBuffer(const Rect& _r, int* stride) const
 
   r = _r.translate(offset.negate());
   if (!r.enclosed_by(buffer.getRect()))
-    throw Exception("RenderedCursor: Invalid area requested");
+    throw std::out_of_range("RenderedCursor: Invalid area requested");
 
   return buffer.getBuffer(r, stride);
 }

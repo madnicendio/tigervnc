@@ -50,87 +50,93 @@ void Surface::clear(unsigned char r, unsigned char g, unsigned char b, unsigned 
   }
 }
 
-void Surface::draw(int src_x, int src_y, int x, int y, int w, int h)
+void Surface::draw(int src_x, int src_y, int dst_x, int dst_y,
+                   int dst_w, int dst_h)
 {
   HDC dc;
 
   dc = CreateCompatibleDC(fl_gc);
   if (!dc)
-    throw rdr::SystemException("CreateCompatibleDC", GetLastError());
+    throw rdr::win32_error("CreateCompatibleDC", GetLastError());
 
   if (!SelectObject(dc, bitmap))
-    throw rdr::SystemException("SelectObject", GetLastError());
+    throw rdr::win32_error("SelectObject", GetLastError());
 
-  if (!BitBlt(fl_gc, x, y, w, h, dc, src_x, src_y, SRCCOPY)) {
+  if (!BitBlt(fl_gc, dst_x, dst_y, dst_w, dst_h,
+              dc, src_x, src_y, SRCCOPY)) {
     // If the desktop we're rendering to is inactive (like when the screen
     // is locked or the UAC is active), then GDI calls will randomly fail.
     // This is completely undocumented so we have no idea how best to deal
     // with it. For now, we've only seen this error and for this function
     // so only ignore this combination.
     if (GetLastError() != ERROR_INVALID_HANDLE)
-      throw rdr::SystemException("BitBlt", GetLastError());
+      throw rdr::win32_error("BitBlt", GetLastError());
   }
 
   DeleteDC(dc);
 }
 
-void Surface::draw(Surface* dst, int src_x, int src_y, int x, int y, int w, int h)
+void Surface::draw(Surface* dst, int src_x, int src_y,
+                   int dst_x, int dst_y, int dst_w, int dst_h)
 {
   HDC origdc, dstdc;
 
-  dstdc = CreateCompatibleDC(NULL);
+  dstdc = CreateCompatibleDC(nullptr);
   if (!dstdc)
-    throw rdr::SystemException("CreateCompatibleDC", GetLastError());
+    throw rdr::win32_error("CreateCompatibleDC", GetLastError());
 
   if (!SelectObject(dstdc, dst->bitmap))
-    throw rdr::SystemException("SelectObject", GetLastError());
+    throw rdr::win32_error("SelectObject", GetLastError());
 
   origdc = fl_gc;
   fl_gc = dstdc;
-  draw(src_x, src_y, x, y, w, h);
+  draw(src_x, src_y, dst_x, dst_y, dst_w, dst_h);
   fl_gc = origdc;
 
   DeleteDC(dstdc);
 }
 
 void Surface::blend(int /*src_x*/, int /*src_y*/,
-                    int /*x*/, int /*y*/, int /*w*/, int /*h*/,
+                    int /*dst_x*/, int /*dst_y*/,
+                    int /*dst_w*/, int /*dst_h*/,
                     int /*a*/)
 {
   // Compositing doesn't work properly for window DC:s
   assert(false);
 }
 
-void Surface::blend(Surface* dst, int src_x, int src_y, int x, int y, int w, int h, int a)
+void Surface::blend(Surface* dst, int src_x, int src_y,
+                    int dst_x, int dst_y, int dst_w, int dst_h, int a)
 {
   HDC dstdc, srcdc;
   BLENDFUNCTION blend;
 
-  dstdc = CreateCompatibleDC(NULL);
+  dstdc = CreateCompatibleDC(nullptr);
   if (!dstdc)
-    throw rdr::SystemException("CreateCompatibleDC", GetLastError());
-  srcdc = CreateCompatibleDC(NULL);
+    throw rdr::win32_error("CreateCompatibleDC", GetLastError());
+  srcdc = CreateCompatibleDC(nullptr);
   if (!srcdc)
-    throw rdr::SystemException("CreateCompatibleDC", GetLastError());
+    throw rdr::win32_error("CreateCompatibleDC", GetLastError());
 
   if (!SelectObject(dstdc, dst->bitmap))
-    throw rdr::SystemException("SelectObject", GetLastError());
+    throw rdr::win32_error("SelectObject", GetLastError());
   if (!SelectObject(srcdc, bitmap))
-    throw rdr::SystemException("SelectObject", GetLastError());
+    throw rdr::win32_error("SelectObject", GetLastError());
 
   blend.BlendOp = AC_SRC_OVER;
   blend.BlendFlags = 0;
   blend.SourceConstantAlpha = a;
   blend.AlphaFormat = AC_SRC_ALPHA;
 
-  if (!AlphaBlend(dstdc, x, y, w, h, srcdc, src_x, src_y, w, h, blend)) {
+  if (!AlphaBlend(dstdc, dst_x, dst_y, dst_w, dst_h,
+                  srcdc, src_x, src_y, dst_w, dst_h, blend)) {
     // If the desktop we're rendering to is inactive (like when the screen
     // is locked or the UAC is active), then GDI calls will randomly fail.
     // This is completely undocumented so we have no idea how best to deal
     // with it. For now, we've only seen this error and for this function
     // so only ignore this combination.
     if (GetLastError() != ERROR_INVALID_HANDLE)
-      throw rdr::SystemException("BitBlt", GetLastError());
+      throw rdr::win32_error("BitBlt", GetLastError());
   }
 
   DeleteDC(srcdc);
@@ -152,10 +158,10 @@ void Surface::alloc()
   bih.biHeight       = -height(); // Negative to get top-down
   bih.biCompression  = BI_RGB;
 
-  bitmap = CreateDIBSection(NULL, (BITMAPINFO*)&bih,
-                            DIB_RGB_COLORS, (void**)&data, NULL, 0);
+  bitmap = CreateDIBSection(nullptr, (BITMAPINFO*)&bih,
+                            DIB_RGB_COLORS, (void**)&data, nullptr, 0);
   if (!bitmap)
-    throw rdr::SystemException("CreateDIBSection", GetLastError());
+    throw rdr::win32_error("CreateDIBSection", GetLastError());
 }
 
 void Surface::dealloc()

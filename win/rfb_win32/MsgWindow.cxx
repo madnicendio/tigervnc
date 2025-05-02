@@ -55,14 +55,14 @@ LRESULT CALLBACK MsgWindowProc(HWND wnd, UINT msg, WPARAM wParam, LPARAM lParam)
     SetWindowLongPtr(wnd, GWLP_USERDATA, 0);
   MsgWindow* _this = (MsgWindow*) GetWindowLongPtr(wnd, GWLP_USERDATA);
   if (!_this) {
-    vlog.info("null _this in %p, message %x", wnd, msg);
+    vlog.info("Null _this in %p, message %x", wnd, msg);
     return SafeDefWindowProc(wnd, msg, wParam, lParam);
   }
 
   try {
     result = _this->processMessage(msg, wParam, lParam);
-  } catch (rdr::Exception& e) {
-    vlog.error("untrapped: %s", e.str());
+  } catch (std::exception& e) {
+    vlog.error("Untrapped: %s", e.what());
   }
 
   return result;
@@ -74,15 +74,15 @@ MsgWindowClass::MsgWindowClass() : classAtom(0) {
   wndClass.lpfnWndProc = MsgWindowProc;
   wndClass.cbClsExtra = 0;
   wndClass.cbWndExtra = 0;
-  wndClass.hInstance = instance = GetModuleHandle(0);
-  wndClass.hIcon = 0;
-  wndClass.hCursor = 0;
-  wndClass.hbrBackground = 0;
-  wndClass.lpszMenuName = 0;
+  wndClass.hInstance = instance = GetModuleHandle(nullptr);
+  wndClass.hIcon = nullptr;
+  wndClass.hCursor = nullptr;
+  wndClass.hbrBackground = nullptr;
+  wndClass.lpszMenuName = nullptr;
   wndClass.lpszClassName = "rfb::win32::MsgWindowClass";
   classAtom = RegisterClass(&wndClass);
   if (!classAtom) {
-    throw rdr::SystemException("unable to register MsgWindow window class", GetLastError());
+    throw rdr::win32_error("Unable to register MsgWindow window class", GetLastError());
   }
 }
 
@@ -98,21 +98,21 @@ static MsgWindowClass baseClass;
 // -=- MsgWindow
 //
 
-MsgWindow::MsgWindow(const char* name_) : name(name_), handle(0) {
-  vlog.debug("creating window \"%s\"", name.c_str());
+MsgWindow::MsgWindow(const char* name_) : name(name_), handle(nullptr) {
+  vlog.debug("Creating window \"%s\"", name.c_str());
   handle = CreateWindow((const char*)(intptr_t)baseClass.classAtom,
-                        name.c_str(), WS_OVERLAPPED, 0, 0, 10, 10, 0, 0,
-                        baseClass.instance, this);
+                        name.c_str(), WS_OVERLAPPED, 0, 0, 10, 10,
+                        nullptr, nullptr, baseClass.instance, this);
   if (!handle) {
-    throw rdr::SystemException("unable to create WMNotifier window instance", GetLastError());
+    throw rdr::win32_error("Unable to create WMNotifier window instance", GetLastError());
   }
-  vlog.debug("created window \"%s\" (%p)", name.c_str(), handle);
+  vlog.debug("Created window \"%s\" (%p)", name.c_str(), handle);
 }
 
 MsgWindow::~MsgWindow() {
   if (handle)
     DestroyWindow(handle);
-  vlog.debug("destroyed window \"%s\" (%p)", name.c_str(), handle);
+  vlog.debug("Destroyed window \"%s\" (%p)", name.c_str(), handle);
 }
 
 LRESULT

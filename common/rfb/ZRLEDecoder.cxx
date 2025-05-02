@@ -64,7 +64,7 @@ static inline T readPixel(rdr::ZlibInStream* zis)
 static inline void zlibHasData(rdr::ZlibInStream* zis, size_t length)
 {
   if (!zis->hasData(length))
-    throw Exception("ZRLE decode error");
+    throw protocol_error("ZRLE decode error");
 }
 
 ZRLEDecoder::ZRLEDecoder() : Decoder(DecoderOrdered)
@@ -106,30 +106,29 @@ void ZRLEDecoder::decodeRect(const Rect& r, const uint8_t* buffer,
   rdr::MemInStream is(buffer, buflen);
   const rfb::PixelFormat& pf = server.pf();
   switch (pf.bpp) {
-  case 8:  zrleDecode<uint8_t>(r, &is, &zis, pf, pb); break;
-  case 16: zrleDecode<uint16_t>(r, &is, &zis, pf, pb); break;
-  case 32: zrleDecode<uint32_t>(r, &is, &zis, pf, pb); break;
+  case 8:  zrleDecode<uint8_t>(r, &is, pf, pb); break;
+  case 16: zrleDecode<uint16_t>(r, &is, pf, pb); break;
+  case 32: zrleDecode<uint32_t>(r, &is, pf, pb); break;
   }
 }
 
 template<class T>
 void ZRLEDecoder::zrleDecode(const Rect& r, rdr::InStream* is,
-                             rdr::ZlibInStream* zis,
                              const PixelFormat& pf,
                              ModifiablePixelBuffer* pb)
 {
   int length = is->readU32();
-  zis->setUnderlying(is, length);
+  zis.setUnderlying(is, length);
   Rect t;
   T buf[64 * 64];
 
   Pixel maxPixel = pf.pixelFromRGB((uint16_t)-1, (uint16_t)-1, (uint16_t)-1);
   bool fitsInLS3Bytes = maxPixel < (1<<24);
   bool fitsInMS3Bytes = (maxPixel & 0xff) == 0;
-  bool isLowCPixel = (sizeof(T) == 4) &&
+  bool isLowCPixel = (sizeof(T) == 4) && (pf.depth <= 24) &&
                      ((fitsInLS3Bytes && pf.isLittleEndian()) ||
                       (fitsInMS3Bytes && pf.isBigEndian()));
-  bool isHighCPixel = (sizeof(T) == 4) &&
+  bool isHighCPixel = (sizeof(T) == 4) && (pf.depth <= 24) &&
                       ((fitsInLS3Bytes && pf.isBigEndian()) ||
                        (fitsInMS3Bytes && pf.isLittleEndian()));
 
@@ -141,24 +140,24 @@ void ZRLEDecoder::zrleDecode(const Rect& r, rdr::InStream* is,
 
       t.br.x = __rfbmin(r.br.x, t.tl.x + 64);
 
-      zlibHasData(zis, 1);
-      int mode = zis->readU8();
+      zlibHasData(&zis, 1);
+      int mode = zis.readU8();
       bool rle = mode & 128;
       int palSize = mode & 127;
       T palette[128];
 
       if (isLowCPixel || isHighCPixel)
-        zlibHasData(zis, 3 * palSize);
+        zlibHasData(&zis, 3 * palSize);
       else
-        zlibHasData(zis, sizeof(T) * palSize);
+        zlibHasData(&zis, sizeof(T) * palSize);
 
       for (int i = 0; i < palSize; i++) {
         if (isLowCPixel)
-          palette[i] = readOpaque24A(zis);
+          palette[i] = readOpaque24A(&zis);
         else if (isHighCPixel)
-          palette[i] = readOpaque24B(zis);
+          palette[i] = readOpaque24B(&zis);
         else
-          palette[i] = readPixel<T>(zis);
+          palette[i] = readPixel<T>(&zis);
       }
 
       if (palSize == 1) {
@@ -173,19 +172,19 @@ void ZRLEDecoder::zrleDecode(const Rect& r, rdr::InStream* is,
           // raw
 
           if (isLowCPixel || isHighCPixel)
-            zlibHasData(zis, 3 * t.area());
+            zlibHasData(&zis, 3 * t.area());
           else
-            zlibHasData(zis, sizeof(T) * t.area());
+            zlibHasData(&zis, sizeof(T) * t.area());
 
           if (isLowCPixel || isHighCPixel) {
             for (T* ptr = buf; ptr < buf+t.area(); ptr++) {
               if (isLowCPixel)
-                *ptr = readOpaque24A(zis);
+                *ptr = readOpaque24A(&zis);
               else
-                *ptr = readOpaque24B(zis);
+                *ptr = readOpaque24B(&zis);
             }
           } else {
-            zis->readBytes((uint8_t*)buf, t.area() * sizeof(T));
+            zis.readBytes((uint8_t*)buf, t.area() * sizeof(T));
           }
 
         } else {
@@ -203,8 +202,8 @@ void ZRLEDecoder::zrleDecode(const Rect& r, rdr::InStream* is,
 
             while (ptr < eol) {
               if (nbits == 0) {
-                zlibHasData(zis, 1);
-                byte = zis->readU8();
+                zlibHasData(&zis, 1);
+                byte = zis.readU8();
                 nbits = 8;
               }
               nbits -= bppp;
@@ -225,25 +224,25 @@ void ZRLEDecoder::zrleDecode(const Rect& r, rdr::InStream* is,
           while (ptr < end) {
             T pix;
             if (isLowCPixel || isHighCPixel)
-              zlibHasData(zis, 3);
+              zlibHasData(&zis, 3);
             else
-              zlibHasData(zis, sizeof(T));
+              zlibHasData(&zis, sizeof(T));
             if (isLowCPixel)
-              pix = readOpaque24A(zis);
+              pix = readOpaque24A(&zis);
             else if (isHighCPixel)
-              pix = readOpaque24B(zis);
+              pix = readOpaque24B(&zis);
             else
-              pix = readPixel<T>(zis);
+              pix = readPixel<T>(&zis);
             int len = 1;
             int b;
             do {
-              zlibHasData(zis, 1);
-              b = zis->readU8();
+              zlibHasData(&zis, 1);
+              b = zis.readU8();
               len += b;
             } while (b == 255);
 
             if (end - ptr < len) {
-              throw Exception ("ZRLE decode error");
+              throw protocol_error("ZRLE decode error");
             }
 
             while (len-- > 0) *ptr++ = pix;
@@ -256,19 +255,19 @@ void ZRLEDecoder::zrleDecode(const Rect& r, rdr::InStream* is,
           T* ptr = buf;
           T* end = ptr + t.area();
           while (ptr < end) {
-            zlibHasData(zis, 1);
-            int index = zis->readU8();
+            zlibHasData(&zis, 1);
+            int index = zis.readU8();
             int len = 1;
             if (index & 128) {
               int b;
               do {
-                zlibHasData(zis, 1);
-                b = zis->readU8();
+                zlibHasData(&zis, 1);
+                b = zis.readU8();
                 len += b;
               } while (b == 255);
 
               if (end - ptr < len) {
-                throw Exception ("ZRLE decode error");
+                throw protocol_error("ZRLE decode error");
               }
             }
 
@@ -285,6 +284,6 @@ void ZRLEDecoder::zrleDecode(const Rect& r, rdr::InStream* is,
     }
   }
 
-  zis->flushUnderlying();
-  zis->setUnderlying(NULL, 0);
+  zis.flushUnderlying();
+  zis.setUnderlying(nullptr, 0);
 }

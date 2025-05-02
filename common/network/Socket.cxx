@@ -39,9 +39,15 @@
 #include <fcntl.h>
 #include <errno.h>
 
+#include <rdr/Exception.h>
+
 #include <network/Socket.h>
 
+#include <rfb/LogWriter.h>
+
 using namespace network;
+
+static rfb::LogWriter vlog("Socket");
 
 // -=- Socket initialisation
 static bool socketsInitialised = false;
@@ -53,7 +59,7 @@ void network::initSockets() {
   WSADATA initResult;
   
   if (WSAStartup(requiredVersion, &initResult) != 0)
-    throw SocketException("unable to initialise Winsock2", errorNumber);
+    throw rdr::socket_error("Unable to initialise Winsock2", errorNumber);
 #else
   signal(SIGPIPE, SIG_IGN);
 #endif
@@ -71,7 +77,7 @@ bool network::isSocketListening(int sock)
 }
 
 Socket::Socket(int fd)
-  : instream(0), outstream(0),
+  : instream(nullptr), outstream(nullptr),
     isShutdown_(false), queryConnection(false)
 {
   initSockets();
@@ -79,7 +85,7 @@ Socket::Socket(int fd)
 }
 
 Socket::Socket()
-  : instream(0), outstream(0),
+  : instream(nullptr), outstream(nullptr),
     isShutdown_(false), queryConnection(false)
 {
   initSockets();
@@ -96,6 +102,17 @@ Socket::~Socket()
 // if shutdown() is overridden then the override MUST call on to here
 void Socket::shutdown()
 {
+  try {
+    if (outstream->hasBufferedData()) {
+      outstream->cork(false);
+      outstream->flush();
+      if (outstream->hasBufferedData())
+        vlog.error("Failed to flush remaining socket data on close");
+    }
+  } catch (std::exception& e) {
+    vlog.error("Failed to flush remaining socket data on close: %s", e.what());
+  }
+
   isShutdown_ = true;
   ::shutdown(getFd(), SHUT_RDWR);
 }
@@ -128,14 +145,14 @@ void Socket::setFd(int fd)
   isShutdown_ = false;
 }
 
-SocketListener::SocketListener(int fd)
-  : fd(fd), filter(0)
+SocketListener::SocketListener(int fd_)
+  : fd(fd_), filter(nullptr)
 {
   initSockets();
 }
 
 SocketListener::SocketListener()
-  : fd(-1), filter(0)
+  : fd(-1), filter(nullptr)
 {
   initSockets();
 }
@@ -160,14 +177,14 @@ Socket* SocketListener::accept() {
   int new_sock = -1;
 
   // Accept an incoming connection
-  if ((new_sock = ::accept(fd, 0, 0)) < 0)
-    throw SocketException("unable to accept new connection", errorNumber);
+  if ((new_sock = ::accept(fd, nullptr, nullptr)) < 0)
+    throw rdr::socket_error("Unable to accept new connection", errorNumber);
 
   // Create the socket object & check connection is allowed
   Socket* s = createSocket(new_sock);
   if (filter && !filter->verifyConnection(s)) {
     delete s;
-    return NULL;
+    return nullptr;
   }
 
   return s;
@@ -179,7 +196,7 @@ void SocketListener::listen(int sock)
   if (::listen(sock, 5) < 0) {
     int e = errorNumber;
     closesocket(sock);
-    throw SocketException("unable to set socket to listening mode", e);
+    throw rdr::socket_error("Unable to set socket to listening mode", e);
   }
 
   fd = sock;

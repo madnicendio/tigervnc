@@ -32,7 +32,6 @@ namespace os {
 }
 
 namespace rdr {
-  struct Exception;
   class MemOutStream;
 }
 
@@ -55,7 +54,7 @@ namespace rfb {
   private:
     void logStats();
 
-    void setThreadException(const rdr::Exception& e);
+    void setThreadException(const std::exception& e);
     void throwThreadException();
 
   private:
@@ -98,7 +97,7 @@ namespace rfb {
       void stop();
 
     protected:
-      void worker();
+      void worker() override;
       DecodeManager::QueueEntry* findEntry();
 
     private:
@@ -108,7 +107,7 @@ namespace rfb {
     };
 
     std::list<DecodeThread*> threads;
-    rdr::Exception *threadException;
+    std::exception *threadException;
   };
 }
 

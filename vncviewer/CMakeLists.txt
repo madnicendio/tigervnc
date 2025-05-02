@@ -1,3 +1,7 @@
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+  message(FATAL_ERROR "cmake must be invoked with the top level directory")
+endif()
+
 add_executable(vncviewer
   fltk/Fl_Monitor_Arrangement.cxx
   fltk/Fl_Navigation.cxx
@@ -14,7 +18,6 @@ add_executable(vncviewer
   PlatformPixelBuffer.cxx
   Viewport.cxx
   parameters.cxx
-  keysym2ucs.c
   touch.cxx
   MonitorIndicesParameter.cxx
   vncviewer.cxx)
@@ -33,17 +36,15 @@ endif()
 
 if(WIN32)
   target_sources(vncviewer PRIVATE Win32TouchHandler.cxx win32.c)
-elseif(APPLE)
-  target_sources(vncviewer PRIVATE cocoa.mm osx_to_qnum.c)
-else()
-  target_sources(vncviewer PRIVATE GestureHandler.cxx XInputTouchHandler.cxx xkb_to_qnum.c)
-endif()
-
-if(WIN32)
+  target_sources(vncviewer PRIVATE KeyboardWin32.cxx keysym2ucs.c)
   target_sources(vncviewer PRIVATE Surface_Win32.cxx)
 elseif(APPLE)
+  target_sources(vncviewer PRIVATE cocoa.mm)
+  target_sources(vncviewer PRIVATE KeyboardMacOS.mm osx_to_qnum.c keysym2ucs.c)
   target_sources(vncviewer PRIVATE Surface_OSX.cxx)
 else()
+  target_sources(vncviewer PRIVATE GestureHandler.cxx XInputTouchHandler.cxx)
+  target_sources(vncviewer PRIVATE KeyboardX11.cxx xkb_to_qnum.c)
   target_sources(vncviewer PRIVATE Surface_X11.cxx)
 endif()
 
@@ -62,7 +63,6 @@ else()
   target_link_libraries(vncviewer ${X11_Xi_LIB})
 
   if(X11_Xrandr_LIB)
-    add_definitions(-DHAVE_XRANDR)
     target_link_libraries(vncviewer ${X11_Xrandr_LIB})
   endif()
 endif()

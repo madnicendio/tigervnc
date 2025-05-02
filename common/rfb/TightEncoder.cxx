@@ -43,7 +43,7 @@ struct TightConf {
 // settings for each of 10 compression levels (0..9).
 //
 // NOTE: The parameters used in this encoder are the result of painstaking
-// research by The VirtualGL Project using RFB session captures from a variety
+// research by The VirtualGL project using RFB session captures from a variety
 // of both 2D and 3D applications.  See http://www.VirtualGL.org for the full
 // reports.
 
@@ -60,8 +60,8 @@ static const TightConf conf[10] = {
   { 9, 9, 9 }  // 9
 };
 
-TightEncoder::TightEncoder(SConnection* conn) :
-  Encoder(conn, encodingTight, EncoderPlain, 256)
+TightEncoder::TightEncoder(SConnection* conn_) :
+  Encoder(conn_, encodingTight, EncoderPlain, 256)
 {
   setCompressLevel(-1);
 }
@@ -260,12 +260,12 @@ void TightEncoder::flushZlibOutStream(rdr::OutStream* os_)
   rdr::ZlibOutStream* zos;
 
   zos = dynamic_cast<rdr::ZlibOutStream*>(os_);
-  if (zos == NULL)
+  if (zos == nullptr)
     return;
 
   zos->cork(false);
   zos->flush();
-  zos->setUnderlying(NULL);
+  zos->setUnderlying(nullptr);
 
   os = conn->getOutStream();
 

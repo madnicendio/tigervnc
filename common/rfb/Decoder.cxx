@@ -38,7 +38,7 @@
 
 using namespace rfb;
 
-Decoder::Decoder(enum DecoderFlags flags) : flags(flags)
+Decoder::Decoder(enum DecoderFlags flags_) : flags(flags_)
 {
 }
 
@@ -107,6 +107,6 @@ Decoder* Decoder::createDecoder(int encoding)
     return new H264Decoder();
 #endif
   default:
-    return NULL;
+    return nullptr;
   }
 }

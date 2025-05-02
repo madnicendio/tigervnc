@@ -52,11 +52,11 @@ class DummyOutStream : public rdr::OutStream {
 public:
   DummyOutStream();
 
-  virtual size_t length();
-  virtual void flush();
+  size_t length() override;
+  void flush() override;
 
 private:
-  virtual void overrun(size_t needed);
+  void overrun(size_t needed) override;
 
   int offset;
   uint8_t buf[131072];
@@ -67,15 +67,16 @@ public:
   CConn(const char *filename);
   ~CConn();
 
-  virtual void initDone();
-  virtual void setPixelFormat(const rfb::PixelFormat& pf);
-  virtual void setCursor(int, int, const rfb::Point&, const uint8_t*);
-  virtual void setCursorPos(const rfb::Point&);
-  virtual void framebufferUpdateStart();
-  virtual void framebufferUpdateEnd();
-  virtual void setColourMapEntries(int, int, uint16_t*);
-  virtual void bell();
-  virtual void serverCutText(const char*);
+  void initDone() override;
+  void setCursor(int, int, const rfb::Point&, const uint8_t*) override;
+  void setCursorPos(const rfb::Point&) override;
+  void framebufferUpdateStart() override;
+  void framebufferUpdateEnd() override;
+  void setColourMapEntries(int, int, uint16_t*) override;
+  void bell() override;
+  void serverCutText(const char*) override;
+  virtual void getUserPasswd(bool secure, std::string *user, std::string *password) override;
+  virtual bool showMsgBox(rfb::MsgBoxFlags flags, const char *title, const char *text) override;
 
 public:
   double cpuTime;
@@ -83,6 +84,7 @@ public:
 protected:
   rdr::FileInStream *in;
   DummyOutStream *out;
+
 };
 
 DummyOutStream::DummyOutStream()
@@ -108,7 +110,7 @@ void DummyOutStream::overrun(size_t needed)
 {
   flush();
   if (avail() < needed)
-    throw rdr::Exception("Insufficient dummy output buffer");
+    throw std::out_of_range("Insufficient dummy output buffer");
 }
 
 CConn::CConn(const char *filename)
@@ -137,12 +139,6 @@ void CConn::initDone()
   setFramebuffer(new rfb::ManagedPixelBuffer(filePF,
                                              server.width(),
                                              server.height()));
-}
-
-void CConn::setPixelFormat(const rfb::PixelFormat& /*pf*/)
-{
-  // Override format
-  CConnection::setPixelFormat(filePF);
 }
 
 void CConn::setCursor(int, int, const rfb::Point&, const uint8_t*)
@@ -181,6 +177,15 @@ void CConn::serverCutText(const char*)
 {
 }
 
+void CConn::getUserPasswd(bool, std::string *, std::string *)
+{
+}
+
+bool CConn::showMsgBox(rfb::MsgBoxFlags, const char *, const char *)
+{
+    return true;
+}
+
 struct stats
 {
   double decodeTime;
@@ -193,25 +198,25 @@ static struct stats runTest(const char *fn)
   struct timeval start, stop;
   struct stats s;
 
-  gettimeofday(&start, NULL);
+  gettimeofday(&start, nullptr);
 
   try {
     cc = new CConn(fn);
-  } catch (rdr::Exception& e) {
-    fprintf(stderr, "Failed to open rfb file: %s\n", e.str());
+  } catch (std::exception& e) {
+    fprintf(stderr, "Failed to open rfb file: %s\n", e.what());
     exit(1);
   }
 
   try {
     while (true)
       cc->processMsg();
-  } catch (rdr::EndOfStream& e) {
-  } catch (rdr::Exception& e) {
-    fprintf(stderr, "Failed to run rfb file: %s\n", e.str());
+  } catch (rdr::end_of_stream& e) {
+  } catch (std::exception& e) {
+    fprintf(stderr, "Failed to run rfb file: %s\n", e.what());
     exit(1);
   }
 
-  gettimeofday(&stop, NULL);
+  gettimeofday(&stop, nullptr);
 
   s.decodeTime = cc->cpuTime;
   s.realTime = (double)stop.tv_sec - start.tv_sec;

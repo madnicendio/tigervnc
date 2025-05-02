@@ -21,13 +21,11 @@
 #include <config.h>
 #endif
 
+#include <algorithm>
 #include <rdr/HexInStream.h>
-#include <rdr/Exception.h>
 #include <rfb/util.h>
 
 using namespace rdr;
-
-static inline int min(int a, int b) {return a<b ? a : b;}
 
 HexInStream::HexInStream(InStream& is)
 : in_stream(is)
@@ -37,18 +35,17 @@ HexInStream::HexInStream(InStream& is)
 HexInStream::~HexInStream() {
 }
 
-
 bool HexInStream::fillBuffer() {
   if (!in_stream.hasData(2))
     return false;
 
-  size_t length = min(in_stream.avail()/2, availSpace());
+  size_t length = std::min(in_stream.avail()/2, availSpace());
   const uint8_t* iptr = in_stream.getptr(length*2);
 
   uint8_t* optr = (uint8_t*) end;
   for (size_t i=0; i<length; i++) {
     if (!rfb::hexToBin((const char*)&iptr[i*2], 2, &optr[i], 1))
-      throw Exception("HexInStream: Invalid input data");
+      throw std::runtime_error("HexInStream: Invalid input data");
   }
 
   in_stream.setptr(length*2);

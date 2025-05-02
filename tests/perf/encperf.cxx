@@ -41,6 +41,8 @@
 #include <rdr/OutStream.h>
 #include <rdr/FileInStream.h>
 
+#include <rfb/AccessRights.h>
+
 #include <rfb/PixelFormat.h>
 
 #include <rfb/CConnection.h>
@@ -78,11 +80,11 @@ class DummyOutStream : public rdr::OutStream {
 public:
   DummyOutStream();
 
-  virtual size_t length();
-  virtual void flush();
+  size_t length() override;
+  void flush() override;
 
 private:
-  virtual void overrun(size_t needed);
+  void overrun(size_t needed) override;
 
   int offset;
   uint8_t buf[131072];
@@ -96,16 +98,18 @@ public:
   void getStats(double& ratio, unsigned long long& bytes,
                 unsigned long long& rawEquivalent);
 
-  virtual void initDone() {};
-  virtual void resizeFramebuffer();
-  virtual void setCursor(int, int, const rfb::Point&, const uint8_t*);
-  virtual void setCursorPos(const rfb::Point&);
-  virtual void framebufferUpdateStart();
-  virtual void framebufferUpdateEnd();
-  virtual bool dataRect(const rfb::Rect&, int);
-  virtual void setColourMapEntries(int, int, uint16_t*);
-  virtual void bell();
-  virtual void serverCutText(const char*);
+  void initDone() override {};
+  void resizeFramebuffer() override;
+  void setCursor(int, int, const rfb::Point&, const uint8_t*) override;
+  void setCursorPos(const rfb::Point&) override;
+  void framebufferUpdateStart() override;
+  void framebufferUpdateEnd() override;
+  bool dataRect(const rfb::Rect&, int) override;
+  void setColourMapEntries(int, int, uint16_t*) override;
+  void bell() override;
+  void serverCutText(const char*) override;
+  virtual void getUserPasswd(bool secure, std::string *user, std::string *password) override;
+  virtual bool showMsgBox(rfb::MsgBoxFlags flags, const char *title, const char *text) override;
 
 public:
   double decodeTime;
@@ -134,10 +138,10 @@ public:
 
   void getStats(double&, unsigned long long&, unsigned long long&);
 
-  virtual void setAccessRights(AccessRights ar);
+  void setAccessRights(rfb::AccessRights ar) override;
 
-  virtual void setDesktopSize(int fb_width, int fb_height,
-                              const rfb::ScreenSet& layout);
+  void setDesktopSize(int fb_width, int fb_height,
+                      const rfb::ScreenSet& layout) override;
 
 protected:
   DummyOutStream *out;
@@ -167,7 +171,7 @@ void DummyOutStream::overrun(size_t needed)
 {
   flush();
   if (avail() < needed)
-    throw rdr::Exception("Insufficient dummy output buffer");
+    throw std::out_of_range("Insufficient dummy output buffer");
 }
 
 CConn::CConn(const char *filename)
@@ -187,7 +191,7 @@ CConn::CConn(const char *filename)
   // Nor the frame buffer size and format
   rfb::PixelFormat pf;
   pf.parse(format);
-  setPixelFormat(pf);
+  server.setPF(pf);
   setDesktopSize(width, height);
 
   sc = new SConn();
@@ -277,8 +281,17 @@ void CConn::serverCutText(const char*)
 {
 }
 
-Manager::Manager(class rfb::SConnection *conn) :
-  EncodeManager(conn)
+void CConn::getUserPasswd(bool, std::string *, std::string *)
+{
+}
+
+bool CConn::showMsgBox(rfb::MsgBoxFlags, const char *, const char *)
+{
+    return true;
+}
+
+Manager::Manager(class rfb::SConnection *conn_) :
+  EncodeManager(conn_)
 {
 }
 
@@ -303,9 +316,10 @@ void Manager::getStats(double& ratio, unsigned long long& encodedBytes,
 }
 
 SConn::SConn()
+: SConnection(rfb::AccessDefault)
 {
   out = new DummyOutStream;
-  setStreams(NULL, out);
+  setStreams(nullptr, out);
 
   setWriter(new rfb::SMsgWriter(&client, out));
 
@@ -320,7 +334,7 @@ SConn::~SConn()
 
 void SConn::writeUpdate(const rfb::UpdateInfo& ui, const rfb::PixelBuffer* pb)
 {
-  manager->writeUpdate(ui, pb, NULL);
+  manager->writeUpdate(ui, pb, nullptr);
 }
 
 void SConn::getStats(double& ratio, unsigned long long& bytes,
@@ -329,7 +343,7 @@ void SConn::getStats(double& ratio, unsigned long long& bytes,
   manager->getStats(ratio, bytes, rawEquivalent);
 }
 
-void SConn::setAccessRights(AccessRights)
+void SConn::setAccessRights(rfb::AccessRights)
 {
 }
 
@@ -354,25 +368,25 @@ static struct stats runTest(const char *fn)
   struct stats s;
   struct timeval start, stop;
 
-  gettimeofday(&start, NULL);
+  gettimeofday(&start, nullptr);
 
   try {
     cc = new CConn(fn);
-  } catch (rdr::Exception& e) {
-    fprintf(stderr, "Failed to open rfb file: %s\n", e.str());
+  } catch (std::exception& e) {
+    fprintf(stderr, "Failed to open rfb file: %s\n", e.what());
     exit(1);
   }
 
   try {
     while (true)
       cc->processMsg();
-  } catch (rdr::EndOfStream& e) {
-  } catch (rdr::Exception& e) {
-    fprintf(stderr, "Failed to run rfb file: %s\n", e.str());
+  } catch (rdr::end_of_stream& e) {
+  } catch (std::exception& e) {
+    fprintf(stderr, "Failed to run rfb file: %s\n", e.what());
     exit(1);
   }
 
-  gettimeofday(&stop, NULL);
+  gettimeofday(&stop, nullptr);
 
   s.decodeTime = cc->decodeTime;
   s.encodeTime = cc->encodeTime;
@@ -385,13 +399,13 @@ static struct stats runTest(const char *fn)
   return s;
 }
 
-static void sort(double *array, int count)
+static void sort(double *array, int len)
 {
   bool sorted;
   int i;
   do {
     sorted = true;
-    for (i = 1; i < count; i++) {
+    for (i = 1; i < len; i++) {
       if (array[i-1] > array[i]) {
         double d;
         d = array[i];
@@ -417,22 +431,20 @@ int main(int argc, char **argv)
 
   const char *fn;
 
-  fn = NULL;
+  fn = nullptr;
   for (i = 1; i < argc; i++) {
-    if (rfb::Configuration::setParam(argv[i]))
-      continue;
+    int ret;
 
-    if (argv[i][0] == '-') {
-      if (i + 1 < argc) {
-        if (rfb::Configuration::setParam(&argv[i][1], argv[i + 1])) {
-          i++;
-          continue;
-        }
-      }
-      usage(argv[0]);
+    ret = rfb::Configuration::handleParamArg(argc, argv, i);
+    if (ret > 0) {
+      i += ret;
+      continue;
     }
 
-    if (fn != NULL)
+    if (argv[i][0] == '-')
+      usage(argv[0]);
+
+    if (fn != nullptr)
       usage(argv[0]);
 
     fn = argv[i];
@@ -444,7 +456,7 @@ int main(int argc, char **argv)
   double *dev = new double[runCount];
   double median, meddev;
 
-  if (fn == NULL) {
+  if (fn == nullptr) {
     fprintf(stderr, "No file specified!\n\n");
     usage(argv[0]);
   }

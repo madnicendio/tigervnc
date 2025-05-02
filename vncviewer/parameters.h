@@ -24,7 +24,7 @@
 #include "MonitorIndicesParameter.h"
 
 #ifdef _WIN32
-#include <vector>
+#include <list>
 #include <string>
 #endif
 
@@ -33,7 +33,9 @@
 
 extern rfb::IntParameter pointerEventInterval;
 extern rfb::BoolParameter emulateMiddleButton;
-extern rfb::BoolParameter dotWhenNoCursor;
+extern rfb::BoolParameter dotWhenNoCursor; // deprecated
+extern rfb::BoolParameter alwaysCursor;
+extern rfb::StringParameter cursorType;
 
 extern rfb::StringParameter passwordFile;
 
@@ -80,12 +82,12 @@ extern rfb::BoolParameter reconnectOnError;
 extern rfb::StringParameter via;
 #endif
 
-void saveViewerParameters(const char *filename, const char *servername=NULL);
+void saveViewerParameters(const char *filename, const char *servername=nullptr);
 char* loadViewerParameters(const char *filename);
 
 #ifdef _WIN32
-void loadHistoryFromRegKey(std::vector<std::string>& serverHistory);
-void saveHistoryToRegKey(const std::vector<std::string>& serverHistory);
+std::list<std::string> loadHistoryFromRegKey();
+void saveHistoryToRegKey(const std::list<std::string>& serverHistory);
 #endif
 
 #endif

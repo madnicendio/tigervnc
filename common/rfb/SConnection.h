@@ -29,6 +29,7 @@
 #include <rdr/InStream.h>
 #include <rdr/OutStream.h>
 
+#include <rfb/AccessRights.h>
 #include <rfb/SMsgHandler.h>
 #include <rfb/SecurityServer.h>
 #include <rfb/Timer.h>
@@ -42,7 +43,7 @@ namespace rfb {
   class SConnection : public SMsgHandler {
   public:
 
-    SConnection();
+    SConnection(AccessRights accessRights);
     virtual ~SConnection();
 
     // Methods to initialise the connection
@@ -60,17 +61,21 @@ namespace rfb {
     // there is data to read on the InStream.
     void initialiseProtocol();
 
-    // processMsg() should be called whenever there is data to read on the
-    // InStream.  You must have called initialiseProtocol() first.
+    // processMsg() should be called whenever there is data available on
+    // the CConnection's current InStream. It will process at most one
+    // RFB message before returning. If there was insufficient data,
+    // then it will return false and should be called again once more
+    // data is available.
     bool processMsg();
 
-    // approveConnection() is called to either accept or reject the connection.
-    // If accept is false, the reason string gives the reason for the
-    // rejection.  It can either be called directly from queryConnection() or
-    // later, after queryConnection() has returned.  It can only be called when
-    // in state RFBSTATE_QUERYING.  On rejection, an AuthFailureException is
-    // thrown, so this must be handled appropriately by the caller.
-    void approveConnection(bool accept, const char* reason=0);
+    // approveConnection() is called to either accept or reject the
+    // connection. If accept is false, the reason string gives the
+    // reason for the rejection.  It can either be called directly from
+    // queryConnection() or later, after queryConnection() has returned.
+    // It can only be called when in state RFBSTATE_QUERYING.  On
+    // rejection, an auth_error is thrown, so this must be handled
+    // appropriately by the caller.
+    void approveConnection(bool accept, const char* reason=nullptr);
 
 
     // Methods to terminate the connection
@@ -82,18 +87,19 @@ namespace rfb {
 
     // Overridden from SMsgHandler
 
-    virtual void setEncodings(int nEncodings, const int32_t* encodings);
+    void setEncodings(int nEncodings, const int32_t* encodings) override;
 
-    virtual void clientCutText(const char* str);
+    void clientCutText(const char* str) override;
 
-    virtual void handleClipboardRequest(uint32_t flags);
-    virtual void handleClipboardPeek();
-    virtual void handleClipboardNotify(uint32_t flags);
-    virtual void handleClipboardProvide(uint32_t flags,
-                                        const size_t* lengths,
-                                        const uint8_t* const* data);
+    void handleClipboardRequest(uint32_t flags) override;
+    void handleClipboardPeek() override;
+    void handleClipboardNotify(uint32_t flags) override;
+    void handleClipboardProvide(uint32_t flags, const size_t* lengths,
+                                const uint8_t* const* data) override;
 
-    virtual void supportsQEMUKeyEvent();
+    void supportsQEMUKeyEvent() override;
+
+    virtual void supportsExtendedMouseButtons() override;
 
 
     // Methods to be overridden in a derived class
@@ -117,27 +123,27 @@ namespace rfb {
 
     // clientInit() is called when the ClientInit message is received.  The
     // derived class must call on to SConnection::clientInit().
-    virtual void clientInit(bool shared);
+    void clientInit(bool shared) override;
 
     // setPixelFormat() is called when a SetPixelFormat message is received.
     // The derived class must call on to SConnection::setPixelFormat().
-    virtual void setPixelFormat(const PixelFormat& pf);
+    void setPixelFormat(const PixelFormat& pf) override;
 
     // framebufferUpdateRequest() is called when a FramebufferUpdateRequest
     // message is received.  The derived class must call on to
     // SConnection::framebufferUpdateRequest().
-    virtual void framebufferUpdateRequest(const Rect& r, bool incremental);
+    void framebufferUpdateRequest(const Rect& r, bool incremental) override;
 
     // fence() is called when we get a fence request or response. By default
     // it responds directly to requests (stating it doesn't support any
     // synchronisation) and drops responses. Override to implement more proper
     // support.
-    virtual void fence(uint32_t flags, unsigned len, const uint8_t data[]);
+    void fence(uint32_t flags, unsigned len, const uint8_t data[]) override;
 
     // enableContinuousUpdates() is called when the client wants to enable
     // or disable continuous updates, or change the active area.
-    virtual void enableContinuousUpdates(bool enable,
-                                         int x, int y, int w, int h);
+    void enableContinuousUpdates(bool enable,
+                                 int x, int y, int w, int h) override;
 
     // handleClipboardRequest() is called whenever the client requests
     // the server to send over its clipboard data. It will only be
@@ -175,20 +181,12 @@ namespace rfb {
     // clipboard via handleClipboardRequest().
     virtual void sendClipboardData(const char* data);
 
+    // getAccessRights() returns the access rights of a SConnection to the server.
+    AccessRights getAccessRights() { return accessRights; }
+
     // setAccessRights() allows a security package to limit the access rights
     // of a SConnection to the server.  How the access rights are treated
     // is up to the derived class.
-
-    typedef uint16_t AccessRights;
-    static const AccessRights AccessView;           // View display contents
-    static const AccessRights AccessKeyEvents;      // Send key events
-    static const AccessRights AccessPtrEvents;      // Send pointer events
-    static const AccessRights AccessCutText;        // Send/receive clipboard events
-    static const AccessRights AccessSetDesktopSize; // Change desktop size
-    static const AccessRights AccessNonShared;      // Exclusive access to the server
-    static const AccessRights AccessDefault;        // The default rights, INCLUDING FUTURE ONES
-    static const AccessRights AccessNoQuery;        // Connect without local user accepting
-    static const AccessRights AccessFull;           // All of the available AND FUTURE rights
     virtual void setAccessRights(AccessRights ar);
     virtual bool accessCheck(AccessRights ar) const;
 
@@ -221,11 +219,11 @@ namespace rfb {
     int32_t getPreferredEncoding() { return preferredEncoding; }
 
   protected:
-    // throwConnFailedException() prints a message to the log, sends a conn
-    // failed message to the client (if possible) and throws a
-    // ConnFailedException.
-    void throwConnFailedException(const char* format, ...)
-      __attribute__((__format__ (__printf__, 2, 3)));
+    // failConnection() prints a message to the log, sends a connection
+    // failed message to the client (if possible) and throws an
+    // Exception.
+    void failConnection(const char* message);
+    void failConnection(const std::string& message);
 
     void setState(stateEnum s) { state_ = s; }
 
@@ -245,7 +243,7 @@ namespace rfb {
     bool processSecurityFailure();
     bool processInitMsg();
 
-    bool handleAuthFailureTimeout(Timer* t);
+    void handleAuthFailureTimeout(Timer* t);
 
     int defaultMajorVersion, defaultMinorVersion;
 

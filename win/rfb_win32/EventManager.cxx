@@ -22,8 +22,9 @@
 
 #include <windows.h>
 
+#include <stdexcept>
+
 #include <rfb_win32/EventManager.h>
-#include <rdr/Exception.h>
 #include <rfb/LogWriter.h>
 
 using namespace rfb;
@@ -59,19 +60,19 @@ void EventManager::removeEvent(HANDLE event) {
       return;
     }
   }
-  throw rdr::Exception("Event not registered");
+  throw std::runtime_error("Event not registered");
 }
 
 
 int EventManager::checkTimeouts() {
-  return 0;
+  return -1;
 }
 
 BOOL EventManager::getMessage(MSG* msg, HWND hwnd, UINT minMsg, UINT maxMsg) {
   while (true) {
     // - Process any pending timeouts
-    DWORD timeout = checkTimeouts();
-    if (timeout == 0)
+    int timeout = checkTimeouts();
+    if (timeout < 0)
       timeout = INFINITE;
 
     // - Events take precedence over messages

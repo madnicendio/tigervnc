@@ -35,7 +35,15 @@
 # your site
 #
 
-$vncUserDir = "$ENV{HOME}/.vnc";
+$vncUserDir = rindex("$ENV{XDG_CONFIG_HOME}", "/", 0) == 0
+  ? "$ENV{XDG_CONFIG_HOME}/tigervnc"
+  : "$ENV{HOME}/.config/tigervnc";
+$vncLegacyDir = "$ENV{HOME}/.vnc";
+if (!stat($vncUserDir) && stat($vncLegacyDir)) {
+  warn "~/.vnc is deprecated, please consult 'man vncsession' for paths to migrate to.";
+  $vncUserDir = $vncLegacyDir;
+}
+
 $vncUserConfig = "$vncUserDir/config";
 
 $vncSystemConfigDir = "@CMAKE_INSTALL_FULL_SYSCONFDIR@/tigervnc";
@@ -230,7 +238,7 @@ close(XAUTH);
 
 $ENV{XAUTHORITY} = $xauthorityFile;
 
-# Now start the X VNC Server
+# Now start the X VNC server
 
 @cmd = ("xinit");
 
@@ -280,7 +288,7 @@ sub LoadConfig {
     if (open(IN, $configFile)) {
       while (<IN>) {
         next if /^#/;
-        if (my ($k, $v) = /^\s*(\w+)\s*=\s*(.+)$/) {
+        if (my ($k, $v) = /^\s*(\w+)\s*=\s*(.*)$/) {
           $k = lc($k); # must normalize key case
           if ($warnoverride && $config{$k}) {
             print("Warning: $configFile is overriding previously defined '$k' to be '$v'\n");

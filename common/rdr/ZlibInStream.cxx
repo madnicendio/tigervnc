@@ -23,13 +23,12 @@
 #include <assert.h>
 
 #include <rdr/ZlibInStream.h>
-#include <rdr/Exception.h>
 #include <zlib.h>
 
 using namespace rdr;
 
 ZlibInStream::ZlibInStream()
-  : underlying(0), zs(NULL), bytesIn(0)
+  : underlying(nullptr), zs(nullptr), bytesIn(0)
 {
   init();
 }
@@ -50,11 +49,11 @@ void ZlibInStream::flushUnderlying()
 {
   while (bytesIn > 0) {
     if (!hasData(1))
-      throw Exception("ZlibInStream: failed to flush remaining stream data");
+      throw std::runtime_error("ZlibInStream: Failed to flush remaining stream data");
     skip(avail());
   }
 
-  setUnderlying(NULL, 0);
+  setUnderlying(nullptr, 0);
 }
 
 void ZlibInStream::reset()
@@ -65,34 +64,34 @@ void ZlibInStream::reset()
 
 void ZlibInStream::init()
 {
-  assert(zs == NULL);
+  assert(zs == nullptr);
 
   zs = new z_stream;
-  zs->zalloc    = Z_NULL;
-  zs->zfree     = Z_NULL;
-  zs->opaque    = Z_NULL;
-  zs->next_in   = Z_NULL;
+  zs->zalloc    = nullptr;
+  zs->zfree     = nullptr;
+  zs->opaque    = nullptr;
+  zs->next_in   = nullptr;
   zs->avail_in  = 0;
   if (inflateInit(zs) != Z_OK) {
     delete zs;
-    zs = NULL;
-    throw Exception("ZlibInStream: inflateInit failed");
+    zs = nullptr;
+    throw std::runtime_error("ZlibInStream: inflateInit failed");
   }
 }
 
 void ZlibInStream::deinit()
 {
-  assert(zs != NULL);
-  setUnderlying(NULL, 0);
+  assert(zs != nullptr);
+  setUnderlying(nullptr, 0);
   inflateEnd(zs);
   delete zs;
-  zs = NULL;
+  zs = nullptr;
 }
 
 bool ZlibInStream::fillBuffer()
 {
   if (!underlying)
-    throw Exception("ZlibInStream overrun: no underlying stream");
+    throw std::runtime_error("ZlibInStream overrun: No underlying stream");
 
   zs->next_out = (uint8_t*)end;
   zs->avail_out = availSpace();
@@ -107,7 +106,7 @@ bool ZlibInStream::fillBuffer()
 
   int rc = inflate(zs, Z_SYNC_FLUSH);
   if (rc < 0) {
-    throw Exception("ZlibInStream: inflate failed");
+    throw std::runtime_error("ZlibInStream: inflate failed");
   }
 
   bytesIn -= length - zs->avail_in;

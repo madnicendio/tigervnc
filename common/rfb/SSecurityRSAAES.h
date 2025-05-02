@@ -24,10 +24,17 @@
 #endif
 
 #include <nettle/rsa.h>
+
 #include <rfb/SSecurity.h>
-#include <rdr/InStream.h>
-#include <rdr/OutStream.h>
+
 #include <rdr/RandomStream.h>
+
+namespace rdr {
+  class InStream;
+  class OutStream;
+  class AESInStream;
+  class AESOutStream;
+}
 
 namespace rfb {
 
@@ -36,10 +43,10 @@ namespace rfb {
     SSecurityRSAAES(SConnection* sc, uint32_t secType,
                     int keySize, bool isAllEncrypted);
     virtual ~SSecurityRSAAES();
-    virtual bool processMsg();
-    virtual const char* getUserName() const;
-    virtual int getType() const { return secType; }
-    virtual SConnection::AccessRights getAccessRights() const
+    bool processMsg() override;
+    const char* getUserName() const override;
+    int getType() const override {return secType;}
+    AccessRights getAccessRights() const override
     {
       return accessRights;
     }
@@ -82,10 +89,10 @@ namespace rfb {
 
     char username[256];
     char password[256];
-    SConnection::AccessRights accessRights;
+    AccessRights accessRights;
 
-    rdr::InStream* rais;
-    rdr::OutStream* raos;
+    rdr::AESInStream* rais;
+    rdr::AESOutStream* raos;
 
     rdr::InStream* rawis;
     rdr::OutStream* rawos;

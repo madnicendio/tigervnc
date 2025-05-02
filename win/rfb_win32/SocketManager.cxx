@@ -24,8 +24,14 @@
 
 #include <winsock2.h>
 #include <list>
+
+#include <rdr/Exception.h>
+
+#include <network/Socket.h>
+
 #include <rfb/LogWriter.h>
 #include <rfb/Timer.h>
+#include <rfb/VNCServer.h>
 #include <rfb/util.h>
 #include <rfb_win32/SocketManager.h>
 
@@ -46,7 +52,7 @@ SocketManager::~SocketManager() {
 
 static void requestAddressChangeEvents(network::SocketListener* sock_) {
   DWORD dummy = 0;
-  if (WSAIoctl(sock_->getFd(), SIO_ADDRESS_LIST_CHANGE, 0, 0, 0, 0, &dummy, 0, 0) == SOCKET_ERROR) {
+  if (WSAIoctl(sock_->getFd(), SIO_ADDRESS_LIST_CHANGE, nullptr, 0, nullptr, 0, &dummy, nullptr, nullptr) == SOCKET_ERROR) {
     DWORD err = WSAGetLastError();
     if (err != WSAEWOULDBLOCK)
       vlog.error("Unable to track address changes: 0x%08x", (unsigned)err);
@@ -55,7 +61,7 @@ static void requestAddressChangeEvents(network::SocketListener* sock_) {
 
 
 void SocketManager::addListener(network::SocketListener* sock_,
-                                network::SocketServer* srvr,
+                                VNCServer* srvr,
                                 AddressChangeNotifier* acn) {
   WSAEVENT event = WSACreateEvent();
   long flags = FD_ACCEPT | FD_CLOSE;
@@ -63,7 +69,7 @@ void SocketManager::addListener(network::SocketListener* sock_,
     flags |= FD_ADDRESS_LIST_CHANGE;
   try {
     if (event && (WSAEventSelect(sock_->getFd(), event, flags) == SOCKET_ERROR))
-      throw rdr::SystemException("Unable to select on listener", WSAGetLastError());
+      throw rdr::socket_error("Unable to select on listener", WSAGetLastError());
 
     // requestAddressChangeEvents MUST happen after WSAEventSelect, so that the socket is non-blocking
     if (acn)
@@ -71,12 +77,12 @@ void SocketManager::addListener(network::SocketListener* sock_,
 
     // addEvent is the last thing we do, so that the event is NOT registered if previous steps fail
     if (!event || !addEvent(event, this))
-      throw rdr::Exception("Unable to add listener");
-  } catch (rdr::Exception& e) {
+      throw std::runtime_error("Unable to add listener");
+  } catch (std::exception& e) {
     if (event)
       WSACloseEvent(event);
     delete sock_;
-    vlog.error("%s", e.str());
+    vlog.error("%s", e.what());
     throw;
   }
 
@@ -99,11 +105,11 @@ void SocketManager::remListener(network::SocketListener* sock) {
       return;
     }
   }
-  throw rdr::Exception("Listener not registered");
+  throw std::runtime_error("Listener not registered");
 }
 
 
-void SocketManager::addSocket(network::Socket* sock_, network::SocketServer* srvr, bool outgoing) {
+void SocketManager::addSocket(network::Socket* sock_, VNCServer* srvr, bool outgoing) {
   WSAEVENT event = WSACreateEvent();
   if (!event || !addEvent(event, this) ||
       (WSAEventSelect(sock_->getFd(), event, FD_READ | FD_CLOSE) == SOCKET_ERROR)) {
@@ -132,10 +138,10 @@ void SocketManager::remSocket(network::Socket* sock_) {
       return;
     }
   }
-  throw rdr::Exception("Socket not registered");
+  throw std::runtime_error("Socket not registered");
 }
 
-bool SocketManager::getDisable(network::SocketServer* srvr)
+bool SocketManager::getDisable(VNCServer* srvr)
 {
   std::map<HANDLE,ListenInfo>::iterator i;
   for (i=listeners.begin(); i!=listeners.end(); i++) {
@@ -143,10 +149,10 @@ bool SocketManager::getDisable(network::SocketServer* srvr)
       return i->second.disable;
     }
   }
-  throw rdr::Exception("Listener not registered");
+  throw std::runtime_error("Listener not registered");
 }
 
-void SocketManager::setDisable(network::SocketServer* srvr, bool disable)
+void SocketManager::setDisable(VNCServer* srvr, bool disable)
 {
   bool found = false;
   std::map<HANDLE,ListenInfo>::iterator i;
@@ -159,15 +165,15 @@ void SocketManager::setDisable(network::SocketServer* srvr, bool disable)
     }
   }
   if (!found)
-    throw rdr::Exception("Listener not registered");
+    throw std::runtime_error("Listener not registered");
 }
 
 int SocketManager::checkTimeouts() {
   int timeout = EventManager::checkTimeouts();
 
-  std::map<HANDLE,ListenInfo>::iterator i;
-  for (i=listeners.begin(); i!=listeners.end(); i++)
-    soonestTimeout(&timeout, Timer::checkTimeouts());
+  int nextTimeout = Timer::checkTimeouts();
+  if (nextTimeout >= 0 && nextTimeout < timeout)
+    timeout = nextTimeout;
 
   std::list<network::Socket*> shutdownSocks;
   std::map<HANDLE,ConnInfo>::iterator j, j_next;
@@ -180,7 +186,7 @@ int SocketManager::checkTimeouts() {
       if (j->second.sock->outStream().hasBufferedData())
         eventMask |= FD_WRITE;
       if (WSAEventSelect(j->second.sock->getFd(), j->first, eventMask) == SOCKET_ERROR)
-        throw rdr::SystemException("unable to adjust WSAEventSelect:%u", WSAGetLastError());
+        throw rdr::socket_error("unable to adjust WSAEventSelect:%u", WSAGetLastError());
     }
   }
 
@@ -197,7 +203,7 @@ void SocketManager::processEvent(HANDLE event) {
     ListenInfo li = listeners[event];
 
     // Accept an incoming connection
-    vlog.debug("accepting incoming connection");
+    vlog.debug("Accepting incoming connection");
 
     // What kind of event is this?
     WSANETWORKEVENTS network_events;
@@ -206,18 +212,18 @@ void SocketManager::processEvent(HANDLE event) {
       network::Socket* new_sock = li.sock->accept();
       if (new_sock && li.disable) {
         delete new_sock;
-        new_sock = 0;
+        new_sock = nullptr;
       }
       if (new_sock)
         addSocket(new_sock, li.server, false);
     } else if (network_events.lNetworkEvents & FD_CLOSE) {
-      vlog.info("deleting listening socket");
+      vlog.info("Deleting listening socket");
       remListener(li.sock);
     } else if (network_events.lNetworkEvents & FD_ADDRESS_LIST_CHANGE) {
       li.notifier->processAddressChange();
       requestAddressChangeEvents(li.sock);
     } else {
-      vlog.error("unknown listener event: %lx", network_events.lNetworkEvents);
+      vlog.error("Unknown listener event: %lx", network_events.lNetworkEvents);
     }
   } else if (connections.count(event)) {
     ConnInfo ci = connections[event];
@@ -225,30 +231,30 @@ void SocketManager::processEvent(HANDLE event) {
     try {
       // Process data from an active connection
 
-      WSANETWORKEVENTS events;
+      WSANETWORKEVENTS network_events;
       long eventMask;
 
       // Fetch why this event notification triggered
-      if (WSAEnumNetworkEvents(ci.sock->getFd(), event, &events) == SOCKET_ERROR)
-        throw rdr::SystemException("unable to get WSAEnumNetworkEvents:%u", WSAGetLastError());
+      if (WSAEnumNetworkEvents(ci.sock->getFd(), event, &network_events) == SOCKET_ERROR)
+        throw rdr::socket_error("Unable to get WSAEnumNetworkEvents:%u", WSAGetLastError());
 
       // Cancel event notification for this socket
       if (WSAEventSelect(ci.sock->getFd(), event, 0) == SOCKET_ERROR)
-        throw rdr::SystemException("unable to disable WSAEventSelect:%u", WSAGetLastError());
+        throw rdr::socket_error("unable to disable WSAEventSelect:%u", WSAGetLastError());
 
       // Reset the event object
       WSAResetEvent(event);
 
 
       // Call the socket server to process the event
-      if (events.lNetworkEvents & FD_WRITE) {
+      if (network_events.lNetworkEvents & FD_WRITE) {
         ci.server->processSocketWriteEvent(ci.sock);
         if (ci.sock->isShutdown()) {
           remSocket(ci.sock);
           return;
         }
       }
-      if (events.lNetworkEvents & (FD_READ | FD_CLOSE)) {
+      if (network_events.lNetworkEvents & (FD_READ | FD_CLOSE)) {
         ci.server->processSocketReadEvent(ci.sock);
         if (ci.sock->isShutdown()) {
           remSocket(ci.sock);
@@ -262,9 +268,9 @@ void SocketManager::processEvent(HANDLE event) {
       if (ci.sock->outStream().hasBufferedData())
         eventMask |= FD_WRITE;
       if (WSAEventSelect(ci.sock->getFd(), event, eventMask) == SOCKET_ERROR)
-        throw rdr::SystemException("unable to re-enable WSAEventSelect:%u", WSAGetLastError());
-    } catch (rdr::Exception& e) {
-      vlog.error("%s", e.str());
+        throw rdr::socket_error("unable to re-enable WSAEventSelect:%u", WSAGetLastError());
+    } catch (std::exception& e) {
+      vlog.error("%s", e.what());
       remSocket(ci.sock);
     }
   }

@@ -37,7 +37,7 @@ struct TightJPEGConfiguration {
 };
 
 // NOTE:  The JPEG quality and subsampling levels below were obtained
-// experimentally by the VirtualGL Project.  They represent the approximate
+// experimentally by the VirtualGL project.  They represent the approximate
 // average compression ratios listed below, as measured across the set of
 // every 10th frame in the SPECviewperf 9 benchmark suite.
 //
@@ -68,8 +68,8 @@ static const struct TightJPEGConfiguration conf[10] = {
 };
 
 
-TightJPEGEncoder::TightJPEGEncoder(SConnection* conn) :
-  Encoder(conn, encodingTight,
+TightJPEGEncoder::TightJPEGEncoder(SConnection* conn_) :
+  Encoder(conn_, encodingTight,
           (EncoderFlags)(EncoderUseNativePF | EncoderLossy), -1, 9),
   qualityLevel(-1), fineQuality(-1), fineSubsampling(subsampleUndefined)
 {
