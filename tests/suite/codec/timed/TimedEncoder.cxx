@@ -4,6 +4,7 @@
 #include <rfb/PixelBuffer.h>
 #include <rfb/SConnection.h>
 #include <chrono>
+#include <algorithm>
 
 namespace suite {
 
@@ -32,6 +33,7 @@ namespace suite {
       .outputSizeSolidRects = 0,
       .nRects = 0,
       .nSolidRects = 0,
+      .encodedPixels = 0,
       .name = encoderClassName(encoderclass),
       .writeUpdates = std::map<int,WriteRects>{}
     };
@@ -50,6 +52,10 @@ void TimedEncoder::writeRect(const rfb::PixelBuffer* pb,
   startWriteRectTimer();
   encoder_->writeRect(pb, palette);
   stopWriteRectTimer(pb);
+
+  unsigned long long numPixels = static_cast<unsigned long long>(pb->width()) * pb->height();
+  rectSizes_.push_back(numPixels);
+  stats_->encodedPixels += numPixels;
 }
 
 void TimedEncoder::writeSolidRect(int width, int height,
@@ -156,6 +162,19 @@ void TimedEncoder::writeSolidRect(int width, int height,
   int TimedEncoder::getQualityLevel()
   {
     return encoder_->getQualityLevel();
+  }
+
+  unsigned long long TimedEncoder::medianRectSize() const
+  {
+      if (rectSizes_.empty()) {
+          return 0; // Om inga rektanglar har encodats
+      }
+
+      std::vector<unsigned long long> sortedSizes = rectSizes_;
+      size_t mid = sortedSizes.size() / 2;
+      std::nth_element(sortedSizes.begin(), sortedSizes.begin() + mid, sortedSizes.end());
+
+      return sortedSizes[mid]; // Medianen
   }
 }
 

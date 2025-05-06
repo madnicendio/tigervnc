@@ -7,6 +7,7 @@
 #include "rfb/TightEncoder.h"
 #include "rfb/TightJPEGEncoder.h"
 #include "rfb/ZRLEEncoder.h"
+#include "rfb/JPEGEncoder.h"
 #include <rfb/SConnection.h>
 #include <stdexcept>
 
@@ -34,6 +35,9 @@ namespace suite {
       break;
     case enumEncoder::encoderZRLE:
       e = new rfb::ZRLEEncoder(sconn);
+      break;
+    case enumEncoder::encoderJPEG:
+      e = new rfb::JPEGEncoder(sconn);
       break;
     default:
       throw std::logic_error("decoder not implemented");

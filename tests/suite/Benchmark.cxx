@@ -51,53 +51,50 @@ Benchmark::~Benchmark()
 
 void Benchmark::runBenchmark()
 {
-  EncoderSettings* settings;
+  EncoderSettings* settings = new EncoderSettings[ENCODERS_COUNT];
 
-  settings = new EncoderSettings[ENCODERS_COUNT];
+  int allEncodings[] = {
+    0,  // rfb::encodingRaw
+    1,  // rfb::encodingCopyRect
+    2,  // rfb::encodingRRE
+    4,  // rfb::encodingCoRRE
+    5,  // rfb::encodingHextile
+    7,  // rfb::encodingTight
+    16, // rfb::encodingZRLE
+    -224 // rfb::pseudoEncodingLastRect
+  };
 
-  for (uint i = 0; i < ENCODERS_COUNT; i++) {
-    settings[i] = encoderSettings(static_cast<EncoderClass>(i));
-  }
+  settings->rfbEncoding = allEncodings;
+  settings->encodingSize = sizeof(allEncodings) / sizeof(allEncodings[0]);
 
-  runBenchmark(settings, ENCODERS_COUNT);
+  runBenchmark(settings);
 
   delete [] settings;
 }
 
-void Benchmark::runBenchmark(EncoderSettings* settings, size_t len)
+void Benchmark::runBenchmark(EncoderSettings* settings)
 {
   FrameInStream is;
   std::ifstream file;
-  std::map<EncoderClass, Server*> servers;
+  // std::map<EncoderClass, Server*> servers;
 
   is = FrameInStream();
   file = std::ifstream(filename_);
   is.parseHeader(file); // FIXME: Don't parse header twice
 
-  // Use one Server instance per encoding
-  for (uint i = 0; i < len; i++) {
-    EncoderSettings setting = settings[i];
-    // All encoders in the server will be of one encoder type.
-    Server* s = new Server(width(), height(), setting);
-
-    s->setEncodings(setting.encodingSize, setting.rfbEncoding);
-    servers[setting.encoderClass] = s;
-  }
+  Server* server = new Server(width(), height(), *settings);
+  server->setEncodings(settings->encodingSize, settings->rfbEncoding);
 
   std::cout << "Starting benchmark using \"" << filename_ << "\"\n";
   RecorderStats recorderStats;
+  // Extract images from the file
   while (file.peek() != EOF) {
+    // This function uses recorderStats to record information
     const Image* image = is.readImage(file, recorderStats);
 
-    // For each encoding we want to test, we load an image and loop
-    // through all servers
-    for (uint i = 0; i < len; i++) {
-      EncoderSettings setting = settings[i];
-      Server* server = servers[setting.encoderClass];
+    server->loadImage(image, image->x_offset_, image->y_offset_);
+    server->out->clear();
 
-      server->loadImage(image, image->x_offset_, image->y_offset_);
-      server->out->clear();
-    }
 
 #ifdef _DEBUG
     debugServer_->loadImage(image, image->x_offset_, image->y_offset_);
@@ -105,20 +102,94 @@ void Benchmark::runBenchmark(EncoderSettings* settings, size_t len)
     delete image;
   }
   std::cout << "Benchmarking complete!\n";
+  fprintf(stderr, "\n");
+  fprintf(stderr, "==========================================[ STATS: ]=========================================\n\n");
 
-  // Loop through each server and print the corresponding statistics
-  for (auto &s : servers) {
-    // FIXME: Refactor this to a separate function
-    std::string encoderRequested = encoderClasstoString(s.first);
-    Server* server = s.second;
-    ManagerStats managerStats = server->stats();
+  // Output encoderstats:
+  std::vector<rfb::Encoder*> allEncoders = server->manager->getEncoders();
 
-    if (!managerStats.encoders.size())
-      continue; // FIXME: throw/log error?
+  std::vector<std::pair<std::string, suite::TimedEncoder*>> encoders = {
+    {"Tight", dynamic_cast<suite::TimedEncoder*>(allEncoders[encoderTight])},
+    {"JPEG", dynamic_cast<suite::TimedEncoder*>(allEncoders[encoderJPEG])}
+  };
 
-    managerStats.print();
-    delete server;
-  }
+  long double totalWriteRectTime = 0.0;
+  long long unsigned totalEncodedPixels = 0;
+  int totalNumberOfRects = 0;
+  long long unsigned totalMedianRectSize = 0;
+  double totalMPixelsPerSecond = 0.0;
+  double totalCompressionRatio = 0.0;
+
+  for (size_t i = 0; i < encoders.size(); ++i) {
+    suite::TimedEncoder* encoder = encoders[i].second;
+    if (encoder) {
+        EncoderStats* stats = encoder->stats();
+        totalWriteRectTime += stats->writeRectEncodetime;
+        totalEncodedPixels += stats->encodedPixels;
+        totalNumberOfRects += stats->nRects;
+        totalMedianRectSize += encoder->medianRectSize();
+    }
+}
+
+// Skriv ut tabell
+fprintf(stderr, "+------------+------------+------------+------------+------------+------------+------------+\n");
+fprintf(stderr, "| %-10s | %-10s | %-10s | %-10s | %-10s | %-10s | %-10s |\n",
+        "Encoder", "Time (ms)", "#Pixels %", "# Rects", "MedianRect", "MPx/s", "Compr.");
+fprintf(stderr, "+------------+------------+------------+------------+------------+------------+------------+\n");
+
+for (size_t i = 0; i < encoders.size(); ++i) {
+    std::string name = encoders[i].first;
+    suite::TimedEncoder* encoder = encoders[i].second;
+    if (encoder) {
+        EncoderStats* stats = encoder->stats();
+        double percentage = (100.0 * stats->encodedPixels) / totalEncodedPixels;
+        double mpixelsPerSecond = stats->megaPixelsPerSecondRects();
+        double compressionRatio = stats->compressionRatioRects();
+        long long unsigned medianRectSize = encoder->medianRectSize();
+
+        fprintf(stderr, "| %-10s | %-10.2Lf | %-10.2f | %-10d | %-10llu | %-10.2f | %-10.2f |\n",
+                name.c_str(),
+                stats->writeRectEncodetime,
+                percentage,
+                stats->nRects,
+                medianRectSize,
+                mpixelsPerSecond,
+                compressionRatio);
+
+        totalMPixelsPerSecond += mpixelsPerSecond * percentage/100;
+        totalCompressionRatio += compressionRatio * percentage/100;
+    }
+}
+
+fprintf(stderr, "+------------+------------+------------+------------+------------+------------+------------+\n");
+fprintf(stderr, "| %-10s | %-10.2Lf | %-10llu | %-10d | %-10llu | %-10.2f | %-10.2f |\n",
+        "Total",
+        totalWriteRectTime,
+        totalEncodedPixels,
+        totalNumberOfRects,
+        totalMedianRectSize / encoders.size(),  // Medelvärde
+        totalMPixelsPerSecond,  // viktat
+        totalCompressionRatio); // viktat
+fprintf(stderr, "+------------+------------+------------+------------+------------+------------+------------+\n\n");
+
+// Ta fram hur lång tid en total frame update tar
+const ManagerStats& stats = server->stats();
+std::vector<WriteUpdate> writeUpdateStats = stats.writeUpdateStats;
+
+// Summera ihop tiden som varje frame Frame har tagit
+double sum = 0;
+for (WriteUpdate& update : writeUpdateStats)
+  sum += update.timeSpent;
+
+fprintf(stderr, "\n+--------------------------------------+------------+\n");
+fprintf(stderr, "| %-36s | %10.3f |\n", "Total time spent writing frames (s)", sum);
+fprintf(stderr, "+--------------------------------------+------------+\n");
+
+
+
+
+
+  exit(0);
 }
 
 EncoderSettings Benchmark::encoderSettings(EncoderClass encoderClass,

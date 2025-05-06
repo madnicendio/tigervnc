@@ -22,6 +22,7 @@ namespace suite {
       encoderTight,
       encoderTightJPEG,
       encoderZRLE,
+      encoderJPEG,
       encoderClassMax,
     };
 
@@ -83,6 +84,8 @@ namespace suite {
       return "Tight (JPEG)";
     case encoderZRLE:
       return "ZRLE";
+    case encoderJPEG:
+      return "JPEG";
     case encoderClassMax:
       break;
     }
@@ -123,7 +126,8 @@ namespace suite {
     void setFineQualityLevel(int quality, int subsampling) override;
     int getCompressLevel() override;
     int getQualityLevel() override;
-
+    std::vector<unsigned long long> rectSizes_;
+    unsigned long long medianRectSize() const;
     uint currentWriteUpdate;
   private:
     rdr::MemOutStream *encoderOutstream;

@@ -60,7 +60,7 @@ bool JPEGDecoder::readRect(const Rect& /*r*/, rdr::InStream* is,
     type = is->readU8();
 
     if (marker != 0xff)
-      throw Exception("Invalid JPEG segment marker: 0x%02x", marker);
+      throw rfb::protocol_error("Invalid JPEG segment marker");
 
     if ((type == 0x01) || ((type >= 0xd0) && type <= 0xd9)) {
       os->writeU8(marker);

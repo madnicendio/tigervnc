@@ -39,13 +39,23 @@ namespace suite {
                                            currentWriteUpdate(0)
   {
     // Free encoders from EncodeManager and replace with TimedEncoders
-    for (rfb::Encoder* e : encoders)
-      delete e;
+    // for (rfb::Encoder* e : encoders)
+    //   delete e;
 
-    EncoderClass encoderClass = settings.encoderClass;
-    TimedEncoder* timedEncoder = constructTimedEncoder(encoderClass, conn_);
-    stats_.encoders.push_back(timedEncoder);
-    setActiveEncoder(timedEncoder);
+    // EncoderClass encoderClass = settings.encoderClass;
+    // TimedEncoder* timedEncoder = constructTimedEncoder(encoderClass, conn_);
+    // stats_.encoders.push_back(timedEncoder);
+    // setActiveEncoder(timedEncoder);
+
+    for (int i = 0; i < encoderClassMax; i++) {
+      EncoderClass klass = static_cast<EncoderClass>(i);
+      TimedEncoder* e = new TimedEncoder(klass, encoders[klass], conn_);
+      if (!e) {
+        fprintf(stderr, "nullptr\n");
+      }
+      encoders[klass] = e;
+      stats_.encoders.push_back(e);
+    }
   }
 
   Manager::~Manager()
@@ -120,5 +130,10 @@ namespace suite {
     encoders[encoderTight] = encoder;
     encoders[encoderTightJPEG] = encoder;
     encoders[encoderZRLE] = encoder;
+  }
+
+  std::vector<rfb::Encoder*> Manager::getEncoders()
+  {
+    return encoders;
   }
 }

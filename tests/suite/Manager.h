@@ -53,6 +53,7 @@ namespace suite {
     ManagerStats stats() { return stats_; };
     void updateCurrentWriteUpdate();
     void setActiveEncoder(TimedEncoder* encoder);
+    std::vector<rfb::Encoder*> getEncoders();
 
   protected:
     const bool SINGLE_ENCODER;
