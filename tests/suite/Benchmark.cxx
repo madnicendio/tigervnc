@@ -7,6 +7,7 @@
 #include <rfb/Exception.h>
 #include <rfb/encodings.h>
 #include <fstream>
+#include <sstream>
 #include <iostream>
 #include <stdexcept>
 #include <sys/stat.h>
@@ -119,6 +120,20 @@ void Benchmark::runBenchmark(EncoderSettings* settings)
   long long unsigned totalMedianRectSize = 0;
   double totalMPixelsPerSecond = 0.0;
   double totalCompressionRatio = 0.0;
+  std::string outDir = "/local/home/madni/Exjobb/data/";
+  // remove dirs in filename
+  std::string baseName = filename_;
+  size_t lastSlash = baseName.find_last_of("/\\");
+  if (lastSlash != std::string::npos) {
+      baseName = baseName.substr(lastSlash + 1);
+  }
+  // remove file type
+  std::string suffix = ".data";
+  if (baseName.size() >= suffix.size() &&
+      baseName.compare(baseName.size() - suffix.size(), suffix.size(), suffix) == 0) {
+      baseName = baseName.substr(0, baseName.size() - suffix.size());
+  }
+
 
   for (size_t i = 0; i < encoders.size(); ++i) {
     suite::TimedEncoder* encoder = encoders[i].second;
@@ -128,6 +143,21 @@ void Benchmark::runBenchmark(EncoderSettings* settings)
         totalEncodedPixels += stats->encodedPixels;
         totalNumberOfRects += stats->nRects;
         totalMedianRectSize += encoder->medianRectSize();
+
+
+        // Spara rectSizes_ till fil
+        std::ostringstream outName;
+        outName << outDir << baseName << "_rectsizes_" << encoders[i].first << ".txt";
+        std::ofstream outFile(outName.str());
+
+        if (!outFile) {
+            std::cerr << "Kunde inte öppna fil för skrivning: " << outName.str() << "\n";
+            continue;
+        }
+
+        for (auto r : encoder->rectSizes_) {
+            outFile << r << "\n";
+        }
     }
 }
 
@@ -176,18 +206,25 @@ fprintf(stderr, "+------------+------------+------------+------------+----------
 const ManagerStats& stats = server->stats();
 std::vector<WriteUpdate> writeUpdateStats = stats.writeUpdateStats;
 
+// Spara frame sizes till en fil
+std::ostringstream frameOutName;
+frameOutName << outDir << baseName << "_framesizes" << ".txt";
+std::ofstream frameOutFile(frameOutName.str());
+
+if (!frameOutFile) {
+  std::cerr << "Kunde inte öppna fil för skrivning: " << frameOutName.str() << "\n";
+}
 // Summera ihop tiden som varje frame Frame har tagit
 double sum = 0;
-for (WriteUpdate& update : writeUpdateStats)
+for (WriteUpdate& update : writeUpdateStats) {
   sum += update.timeSpent;
+  frameOutFile << update.size << "\n";
+}
+frameOutFile.close();
 
 fprintf(stderr, "\n+--------------------------------------+------------+\n");
 fprintf(stderr, "| %-36s | %10.3f |\n", "Total time spent writing frames (s)", sum);
 fprintf(stderr, "+--------------------------------------+------------+\n");
-
-
-
-
 
   exit(0);
 }
